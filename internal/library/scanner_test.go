@@ -654,6 +654,141 @@ func makeMinimalEPUBWithCover(t *testing.T, path string, coverBytes []byte) {
 	}
 }
 
+// makeMinimalEPUBWithMetadata creates a minimal EPUB with both cover and metadata.
+func makeMinimalEPUBWithMetadata(t *testing.T, path string, coverBytes []byte) {
+	t.Helper()
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("create epub: %v", err)
+	}
+	defer f.Close()
+
+	w := zip.NewWriter(f)
+	defer w.Close()
+
+	// mimetype
+	mf, err := w.Create("mimetype")
+	if err != nil {
+		t.Fatalf("create mimetype: %v", err)
+	}
+	if _, err := mf.Write([]byte("application/epub+zip")); err != nil {
+		t.Fatalf("write mimetype: %v", err)
+	}
+
+	// META-INF/container.xml
+	cf, err := w.Create("META-INF/container.xml")
+	if err != nil {
+		t.Fatalf("create container.xml: %v", err)
+	}
+	containerXML := `<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`
+	if _, err := cf.Write([]byte(containerXML)); err != nil {
+		t.Fatalf("write container.xml: %v", err)
+	}
+
+	// OEBPS/content.opf with metadata
+	opf, err := w.Create("OEBPS/content.opf")
+	if err != nil {
+		t.Fatalf("create content.opf: %v", err)
+	}
+	opfXML := `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+    <dc:title>Scanned Book Title</dc:title>
+    <dc:creator opf:role="aut">Scanned Author</dc:creator>
+    <dc:publisher>Scan Publisher</dc:publisher>
+    <dc:language>en</dc:language>
+  </metadata>
+  <manifest>
+    <item id="cover-img" href="images/cover.jpg" media-type="image/jpeg" properties="cover-image"/>
+  </manifest>
+</package>`
+	if _, err := opf.Write([]byte(opfXML)); err != nil {
+		t.Fatalf("write content.opf: %v", err)
+	}
+
+	// OEBPS/images/cover.jpg
+	imgFile, err := w.Create("OEBPS/images/cover.jpg")
+	if err != nil {
+		t.Fatalf("create cover image: %v", err)
+	}
+	if _, err := imgFile.Write(coverBytes); err != nil {
+		t.Fatalf("write cover image: %v", err)
+	}
+}
+
+func TestScanner_BookPerFile_ExtractsMetadataFromEPUB(t *testing.T) {
+	db := openTestDB(t)
+	dir := t.TempDir()
+	dataDir := t.TempDir()
+
+	epubPath := filepath.Join(dir, "book_with_meta.epub")
+	coverBytes := makeSmallJPEG(t)
+	makeMinimalEPUBWithMetadata(t, epubPath, coverBytes)
+
+	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
+	lp := addLibraryPath(t, db, lib.ID, dir)
+
+	scanner := library.NewScanner(db, dataDir, newTestLogger(t))
+	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
+	if err != nil {
+		t.Fatalf("ScanLibrary: %v", err)
+	}
+
+	if result.BooksAdded != 1 {
+		t.Fatalf("BooksAdded = %d; want 1", result.BooksAdded)
+	}
+	if len(result.Errors) != 0 {
+		t.Errorf("unexpected errors: %v", result.Errors)
+	}
+
+	books := listBooksForLibrary(t, db, lib.ID)
+	if len(books) != 1 {
+		t.Fatalf("expected 1 book; got %d", len(books))
+	}
+
+	q := book.New(db)
+	meta, err := q.GetBookMetadata(context.Background(), books[0].ID)
+	if err != nil {
+		t.Fatalf("GetBookMetadata: %v", err)
+	}
+
+	t.Run("title", func(t *testing.T) {
+		if !meta.Title.Valid || meta.Title.String != "Scanned Book Title" {
+			t.Errorf("title = %v; want %q", meta.Title, "Scanned Book Title")
+		}
+	})
+
+	t.Run("publisher", func(t *testing.T) {
+		if !meta.Publisher.Valid || meta.Publisher.String != "Scan Publisher" {
+			t.Errorf("publisher = %v; want %q", meta.Publisher, "Scan Publisher")
+		}
+	})
+
+	t.Run("language", func(t *testing.T) {
+		if !meta.Language.Valid || meta.Language.String != "en" {
+			t.Errorf("language = %v; want %q", meta.Language, "en")
+		}
+	})
+
+	t.Run("authors", func(t *testing.T) {
+		authors, err := q.ListBookAuthors(context.Background(), books[0].ID)
+		if err != nil {
+			t.Fatalf("ListBookAuthors: %v", err)
+		}
+		if len(authors) != 1 {
+			t.Fatalf("authors count = %d; want 1", len(authors))
+		}
+		if authors[0].Name != "Scanned Author" {
+			t.Errorf("author name = %q; want %q", authors[0].Name, "Scanned Author")
+		}
+	})
+}
+
 func TestScanner_BookPerFile_ExtractsCoverFromEPUB(t *testing.T) {
 	db := openTestDB(t)
 	dir := t.TempDir()

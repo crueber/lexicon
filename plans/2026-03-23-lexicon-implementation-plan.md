@@ -2139,20 +2139,20 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Parallelizable with**: Phase 08
 
 **Changes**:
-- EPUB OPF parsing: title, authors, description, publisher, date, language, ISBN, series
-- PDF XMP/DocInfo parsing: title, author, subject, keywords
-- CBZ ComicInfo.xml parsing: full comic metadata
-- Audio tag parsing (ID3, MP4): title, artist, album, track, year
-- Author/series/category record creation and linking
-- Metadata populated in `book_metadata` during scan
+- [x] EPUB OPF parsing: title, authors, description, publisher, date, language, ISBN, series
+- [x] PDF XMP/DocInfo parsing: title, author, subject, keywords
+- [x] CBZ ComicInfo.xml parsing: full comic metadata
+- [x] Audio tag parsing (ID3, MP4): title, artist, album, track, year
+- [x] Author/series/category record creation and linking
+- [x] Metadata populated in `book_metadata` during scan
 
 **Verification**:
-- Scan EPUBs → title, authors, description populated
-- Scan PDFs → title, author populated
-- Scan CBZ with ComicInfo.xml → comic metadata populated
-- Scan audio files → audiobook metadata populated
-- Author and series records created and linked
-- `go test ./...` passes
+- [x] Scan EPUBs → title, authors, description populated
+- [x] Scan PDFs → title, author populated
+- [x] Scan CBZ with ComicInfo.xml → comic metadata populated
+- [x] Scan audio files → audiobook metadata populated
+- [x] Author and series records created and linked
+- [x] `go test ./...` passes
 
 ---
 

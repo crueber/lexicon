@@ -16,6 +16,132 @@ import (
 	"github.com/crueber/lexicon/internal/storage"
 )
 
+// applyMetadata extracts and persists embedded metadata for a book.
+// It is non-fatal: failures are logged at Debug level and do not propagate.
+func (s *Scanner) applyMetadata(ctx context.Context, bookID int64, filePath, format string) {
+	meta, err := storage.ExtractMetadata(filePath, format)
+	if err != nil {
+		s.logger.Debug("metadata extraction failed", "path", filePath, "format", format, "error", err)
+		return
+	}
+	if meta == nil {
+		return
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		s.logger.Debug("metadata tx begin failed", "book_id", bookID, "error", err)
+		return
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	tq := bookpkg.New(tx)
+
+	// Upsert core metadata fields.
+	upsertParams := bookpkg.UpsertBookMetadataParams{
+		BookID: bookID,
+	}
+	if meta.Title != "" {
+		upsertParams.Title = sql.NullString{String: meta.Title, Valid: true}
+	}
+	if meta.Description != "" {
+		upsertParams.Description = sql.NullString{String: meta.Description, Valid: true}
+	}
+	if meta.Publisher != "" {
+		upsertParams.Publisher = sql.NullString{String: meta.Publisher, Valid: true}
+	}
+	if meta.PublishDate != "" {
+		upsertParams.PublishDate = sql.NullString{String: meta.PublishDate, Valid: true}
+	}
+	if meta.Language != "" {
+		upsertParams.Language = sql.NullString{String: meta.Language, Valid: true}
+	}
+	if meta.ISBN10 != "" {
+		upsertParams.Isbn10 = sql.NullString{String: meta.ISBN10, Valid: true}
+	}
+	if meta.ISBN13 != "" {
+		upsertParams.Isbn13 = sql.NullString{String: meta.ISBN13, Valid: true}
+	}
+
+	if err := tq.UpsertBookMetadata(ctx, upsertParams); err != nil {
+		s.logger.Debug("upsert book metadata failed", "book_id", bookID, "error", err)
+		return
+	}
+
+	// Authors
+	for i, authorName := range meta.Authors {
+		author, err := tq.GetOrCreateAuthor(ctx, authorName)
+		if err != nil {
+			s.logger.Debug("get or create author failed", "name", authorName, "error", err)
+			continue
+		}
+		if err := tq.LinkBookAuthor(ctx, bookpkg.LinkBookAuthorParams{
+			BookID:    bookID,
+			AuthorID:  author.ID,
+			SortOrder: int64(i),
+		}); err != nil {
+			s.logger.Debug("link book author failed", "book_id", bookID, "author_id", author.ID, "error", err)
+		}
+	}
+
+	// Series
+	if meta.Series != "" {
+		series, err := tq.GetOrCreateSeries(ctx, meta.Series)
+		if err != nil {
+			s.logger.Debug("get or create series failed", "name", meta.Series, "error", err)
+		} else {
+			seriesNum := sql.NullFloat64{}
+			if meta.SeriesIndex != 0 {
+				seriesNum = sql.NullFloat64{Float64: meta.SeriesIndex, Valid: true}
+			}
+			if err := tq.LinkBookSeries(ctx, bookpkg.LinkBookSeriesParams{
+				BookID:       bookID,
+				SeriesID:     series.ID,
+				SeriesNumber: seriesNum,
+			}); err != nil {
+				s.logger.Debug("link book series failed", "book_id", bookID, "series_id", series.ID, "error", err)
+			}
+		}
+	}
+
+	// Categories
+	for _, catName := range meta.Categories {
+		cat, err := tq.GetOrCreateCategory(ctx, catName)
+		if err != nil {
+			s.logger.Debug("get or create category failed", "name", catName, "error", err)
+			continue
+		}
+		if err := tq.LinkBookCategory(ctx, bookpkg.LinkBookCategoryParams{
+			BookID:     bookID,
+			CategoryID: cat.ID,
+		}); err != nil {
+			s.logger.Debug("link book category failed", "book_id", bookID, "category_id", cat.ID, "error", err)
+		}
+	}
+
+	// Tags
+	for _, tagName := range meta.Tags {
+		t, err := tq.GetOrCreateTag(ctx, tagName)
+		if err != nil {
+			s.logger.Debug("get or create tag failed", "name", tagName, "error", err)
+			continue
+		}
+		if err := tq.LinkBookTag(ctx, bookpkg.LinkBookTagParams{
+			BookID: bookID,
+			TagID:  t.ID,
+		}); err != nil {
+			s.logger.Debug("link book tag failed", "book_id", bookID, "tag_id", t.ID, "error", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		s.logger.Debug("metadata tx commit failed", "book_id", bookID, "error", err)
+		return
+	}
+
+	s.logger.Debug("applied metadata", "book_id", bookID, "title", meta.Title, "authors", len(meta.Authors))
+}
+
 // supportedFormats maps file extensions to their format strings.
 var supportedFormats = map[string]string{
 	".epub": "EPUB",
@@ -365,6 +491,8 @@ func (s *Scanner) processFolderBookPerFolder(ctx context.Context, lib Library, d
 			firstExt := strings.ToLower(filepath.Ext(files[0]))
 			firstFormat := supportedFormats[firstExt]
 			s.extractAndSaveCover(ctx, bookID, files[0], firstFormat, bookType)
+			// Extract and apply embedded metadata from the first file (non-fatal).
+			s.applyMetadata(ctx, bookID, files[0], firstFormat)
 		}
 	} else {
 		bookID = existingBook.ID
@@ -512,6 +640,9 @@ func (s *Scanner) createBookWithFile(ctx context.Context, libraryID int64, path,
 
 	// Extract and save cover (non-fatal).
 	s.extractAndSaveCover(ctx, book.ID, path, format, bookType)
+
+	// Extract and apply embedded metadata (non-fatal).
+	s.applyMetadata(ctx, book.ID, path, format)
 
 	return nil
 }
