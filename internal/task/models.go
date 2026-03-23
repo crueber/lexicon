@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.30.0
 
-package book
+package task
 
 import (
 	"database/sql"

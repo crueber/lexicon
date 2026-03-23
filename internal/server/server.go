@@ -18,6 +18,7 @@ import (
 	"github.com/crueber/lexicon/internal/book"
 	"github.com/crueber/lexicon/internal/library"
 	"github.com/crueber/lexicon/internal/storage"
+	"github.com/crueber/lexicon/internal/task"
 	"github.com/crueber/lexicon/internal/user"
 	"github.com/crueber/lexicon/internal/ws"
 )
@@ -35,6 +36,9 @@ type Server struct {
 	hub            *ws.Hub
 	wsHandler      *ws.Handler
 	watcher        *library.Watcher
+	taskRunner     *task.Runner
+	taskScheduler  *task.Scheduler
+	taskHandler    *task.Handler
 }
 
 // New creates a new Server with the given configuration, opens the database,
@@ -64,18 +68,33 @@ func New(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("create file watcher: %w", err)
 	}
 
+	// Set up the background task system.
+	taskRunner := task.NewRunner(db, hub, logger)
+	taskRunner.Register(task.TypeLibraryScan, task.NewLibraryScanFunc(db, librarySvc, libraryScanner, logger))
+
+	taskScheduler := task.NewScheduler(taskRunner, db, logger)
+	taskHandler := task.NewHandler(taskRunner, taskScheduler, db, logger)
+
+	libraryHandler := library.NewHandler(librarySvc, libraryScanner, logger)
+	libraryHandler.WithTaskEnqueue(func(taskType, payload string) (int64, error) {
+		return taskRunner.Enqueue(context.Background(), taskType, payload)
+	})
+
 	s := &Server{
 		cfg:            cfg,
 		db:             db,
 		router:         chi.NewRouter(),
 		logger:         logger,
 		authHandler:    auth.NewHandler(db, cfg.JWTSecret, logger),
-		libraryHandler: library.NewHandler(librarySvc, libraryScanner, logger),
+		libraryHandler: libraryHandler,
 		bookHandler:    book.NewHandler(db, logger),
 		storageHandler: storage.NewHandler(db, cfg.DataDir, logger),
 		hub:            hub,
 		wsHandler:      wsHandler,
 		watcher:        watcher,
+		taskRunner:     taskRunner,
+		taskScheduler:  taskScheduler,
+		taskHandler:    taskHandler,
 	}
 
 	if err := s.ensureDefaultAdmin(); err != nil {
@@ -130,6 +149,14 @@ func (s *Server) Start() error {
 		"data_dir", s.cfg.DataDir,
 	)
 
+	// Mark any tasks that were running when the server last stopped as failed.
+	if err := s.taskRunner.MarkInterruptedFailed(context.Background()); err != nil {
+		s.logger.Error("mark interrupted tasks failed", "error", err)
+	}
+
+	// Start the task scheduler.
+	s.taskScheduler.Start(context.Background())
+
 	srv := &http.Server{
 		Addr:    addr,
 		Handler: s.router,
@@ -162,11 +189,15 @@ func (s *Server) Start() error {
 	case sig := <-quit:
 		s.logger.Info("received shutdown signal", "signal", sig.String())
 	case err := <-errCh:
+		s.taskScheduler.Stop()
 		watcherCancel()
 		_ = s.watcher.Close()
 		<-watcherDone
 		return fmt.Errorf("server listen: %w", err)
 	}
+
+	// Stop the task scheduler.
+	s.taskScheduler.Stop()
 
 	// Stop the file watcher.
 	watcherCancel()

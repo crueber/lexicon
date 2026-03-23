@@ -187,6 +187,27 @@ type Tag struct {
 	Name string `json:"name"`
 }
 
+type Task struct {
+	ID          int64          `json:"id"`
+	TaskType    string         `json:"task_type"`
+	Status      string         `json:"status"`
+	Progress    sql.NullInt64  `json:"progress"`
+	Total       sql.NullInt64  `json:"total"`
+	Message     sql.NullString `json:"message"`
+	Error       sql.NullString `json:"error"`
+	Payload     sql.NullString `json:"payload"`
+	CreatedAt   string         `json:"created_at"`
+	UpdatedAt   string         `json:"updated_at"`
+	StartedAt   sql.NullString `json:"started_at"`
+	CompletedAt sql.NullString `json:"completed_at"`
+}
+
+type TaskCronConfiguration struct {
+	TaskType string `json:"task_type"`
+	CronExpr string `json:"cron_expr"`
+	Enabled  int64  `json:"enabled"`
+}
+
 type User struct {
 	ID           int64          `json:"id"`
 	Username     string         `json:"username"`

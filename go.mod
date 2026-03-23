@@ -4,13 +4,16 @@ go 1.25.0
 
 require (
 	github.com/caarlos0/env/v11 v11.4.0
+	github.com/coder/websocket v1.8.14
 	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
 	github.com/disintegration/imaging v1.6.2
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/mholt/archives v0.1.5
 	github.com/pdfcpu/pdfcpu v0.11.1
+	github.com/robfig/cron/v3 v3.0.1
 	golang.org/x/crypto v0.49.0
 	golang.org/x/image v0.32.0
 	modernc.org/sqlite v1.47.0
@@ -23,10 +26,8 @@ require (
 	github.com/bodgit/sevenzip v1.6.1 // indirect
 	github.com/bodgit/windows v1.0.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
-	github.com/coder/websocket v1.8.14 // indirect
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hhrutter/lzw v1.0.0 // indirect

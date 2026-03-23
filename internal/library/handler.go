@@ -3,6 +3,7 @@ package library
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -14,18 +15,26 @@ import (
 
 // Handler handles HTTP requests for library management.
 type Handler struct {
-	svc     *Service
-	scanner *Scanner
-	logger  *slog.Logger
+	svc         *Service
+	scanner     *Scanner
+	taskEnqueue func(taskType, payload string) (int64, error)
+	logger      *slog.Logger
 }
 
 // NewHandler creates a new library Handler.
+// taskEnqueue is an optional function to enqueue background tasks.
+// If nil, scans run synchronously (backward-compatible).
 func NewHandler(svc *Service, scanner *Scanner, logger *slog.Logger) *Handler {
 	return &Handler{
 		svc:     svc,
 		scanner: scanner,
 		logger:  logger,
 	}
+}
+
+// WithTaskEnqueue sets the function used to enqueue background tasks.
+func (h *Handler) WithTaskEnqueue(fn func(taskType, payload string) (int64, error)) {
+	h.taskEnqueue = fn
 }
 
 // Routes registers all library routes on the given router.
@@ -277,7 +286,7 @@ func (h *Handler) handleDelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// ScanResponse is the JSON response for POST /api/libraries/{id}/scan.
+// ScanResponse is the JSON response for POST /api/libraries/{id}/scan (synchronous).
 type ScanResponse struct {
 	BooksAdded   int `json:"booksAdded"`
 	FilesAdded   int `json:"filesAdded"`
@@ -285,7 +294,14 @@ type ScanResponse struct {
 	ErrorCount   int `json:"errorCount"`
 }
 
+// ScanEnqueueResponse is the JSON response for POST /api/libraries/{id}/scan (async).
+type ScanEnqueueResponse struct {
+	TaskID int64 `json:"taskId"`
+}
+
 // handleScan handles POST /api/libraries/{id}/scan.
+// When a task runner is configured, it enqueues a LIBRARY_SCAN task and returns 202 Accepted.
+// Otherwise it runs the scan synchronously (legacy behaviour).
 func (h *Handler) handleScan(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseID(w, r, "id")
 	if !ok {
@@ -299,7 +315,7 @@ func (h *Handler) handleScan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify the library exists and the user has access.
-	lib, err := h.svc.GetByID(r.Context(), id, p)
+	_, err := h.svc.GetByID(r.Context(), id, p)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			writeError(w, http.StatusNotFound, "library not found")
@@ -314,9 +330,31 @@ func (h *Handler) handleScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// If a task enqueuer is configured, run the scan asynchronously.
+	if h.taskEnqueue != nil {
+		payload := fmt.Sprintf(`{"libraryId":%d}`, id)
+		taskID, enqueueErr := h.taskEnqueue("LIBRARY_SCAN", payload)
+		if enqueueErr != nil {
+			h.logger.Warn("enqueue library scan task", "library_id", id, "error", enqueueErr)
+			writeError(w, http.StatusConflict, enqueueErr.Error())
+			return
+		}
+		h.logger.Info("library scan task enqueued", "library_id", id, "task_id", taskID)
+		writeJSON(w, http.StatusAccepted, ScanEnqueueResponse{TaskID: taskID})
+		return
+	}
+
+	// Fallback: synchronous scan.
 	paths, err := h.svc.ListPaths(r.Context(), id)
 	if err != nil {
 		h.logger.Error("list paths for scan", "library_id", id, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	lib, err := h.svc.GetByID(r.Context(), id, p)
+	if err != nil {
+		h.logger.Error("get library for sync scan", "library_id", id, "error", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}

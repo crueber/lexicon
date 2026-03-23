@@ -51,6 +51,12 @@ func (s *Server) setupRoutes() {
 				s.storageHandler.Routes(r)
 			})
 		})
+
+		// Task routes (require auth; admin-only routes enforced inside Routes()).
+		r.Route("/tasks", func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			s.taskHandler.Routes(r)
+		})
 	})
 
 	// Frontend: proxy to Vite in dev mode, serve embedded files in production.
