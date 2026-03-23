@@ -32,6 +32,8 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 }
 
 // viteProxy returns a reverse proxy to the Vite dev server.
+// If the Vite dev server is not reachable, it returns a helpful HTML page
+// instead of a raw 502 Bad Gateway.
 func (s *Server) viteProxy() http.Handler {
 	target, err := url.Parse("http://localhost:5173")
 	if err != nil {
@@ -46,8 +48,25 @@ func (s *Server) viteProxy() http.Handler {
 		r.Host = target.Host
 	}
 
+	proxy.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, _ error) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusBadGateway)
+		fmt.Fprint(w, viteNotRunningPage)
+	}
+
 	return proxy
 }
+
+// viteNotRunningPage is the HTML shown when the Vite dev server is unreachable.
+const viteNotRunningPage = `<!DOCTYPE html>
+<html><head><title>Lexicon - Dev Mode</title></head>
+<body style="background:#1a1a2e;color:#e0e0e0;font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0">
+<div style="text-align:center;max-width:500px">
+<h1>Vite Dev Server Not Running</h1>
+<p>The Go backend is running in dev mode but the Vite frontend dev server is not reachable at localhost:5173.</p>
+<p>Run <code style="background:#2d2d44;padding:2px 8px;border-radius:4px">make run-frontend</code> in another terminal.</p>
+<p style="color:#888;font-size:0.9em">Or run <code style="background:#2d2d44;padding:2px 8px;border-radius:4px">make build</code> to build a production binary with embedded frontend.</p>
+</div></body></html>`
 
 // staticHandler serves the embedded frontend files, falling back to index.html
 // for client-side routing.

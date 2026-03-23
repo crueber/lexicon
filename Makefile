@@ -1,4 +1,4 @@
-.PHONY: build build-frontend embed-frontend run run-frontend test lint clean sqlc-generate docker-build migrate-up migrate-down
+.PHONY: build build-frontend embed-frontend run run-frontend dev test lint clean sqlc-generate docker-build migrate-up migrate-down
 
 BINARY := lexicon
 WEB_DIR := web
@@ -21,6 +21,15 @@ embed-frontend: build-frontend
 # Run in development mode.
 run:
 	DEV_MODE=true go run -tags dev ./cmd/lexicon
+
+# Run full dev environment (instructions).
+dev:
+	@echo "Development requires two terminals:"
+	@echo "  Terminal 1: make run           (Go backend on :6060)"
+	@echo "  Terminal 2: make run-frontend   (Vite dev server on :5173)"
+	@echo ""
+	@echo "Or for a quick test with embedded frontend:"
+	@echo "  make build && ./lexicon"
 
 # Run Vite dev server.
 run-frontend:
