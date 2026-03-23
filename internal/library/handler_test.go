@@ -156,7 +156,8 @@ func newTestRouter(t *testing.T, db *sql.DB) *chi.Mux {
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 	svc := library.NewService(db, logger)
-	h := library.NewHandler(svc, logger)
+	scanner := library.NewScanner(db, logger)
+	h := library.NewHandler(svc, scanner, logger)
 
 	r := chi.NewRouter()
 	r.Route("/api/libraries", func(r chi.Router) {
@@ -800,7 +801,7 @@ func TestListPaths_AuthenticatedUser(t *testing.T) {
 	}
 }
 
-func TestScan_ReturnsAccepted(t *testing.T) {
+func TestScan_ReturnsOK(t *testing.T) {
 	db := openTestDB(t)
 	_, adminToken := seedAdmin(t, db)
 	router := newTestRouter(t, db)
@@ -815,17 +816,18 @@ func TestScan_ReturnsAccepted(t *testing.T) {
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusAccepted {
-		t.Fatalf("status = %d; want %d; body = %s", rec.Code, http.StatusAccepted, rec.Body.String())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d; want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 
-	var resp map[string]string
+	var resp library.ScanResponse
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if resp["message"] != "scan queued" {
-		t.Errorf("message = %q; want %q", resp["message"], "scan queued")
+	// Library has no paths, so nothing should be scanned.
+	if resp.BooksAdded != 0 {
+		t.Errorf("booksAdded = %d; want 0", resp.BooksAdded)
 	}
 }
 

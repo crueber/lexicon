@@ -10,6 +10,17 @@ import (
 	"database/sql"
 )
 
+const countBooksByLibrary = `-- name: CountBooksByLibrary :one
+SELECT COUNT(*) FROM book WHERE library_id = ?
+`
+
+func (q *Queries) CountBooksByLibrary(ctx context.Context, libraryID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countBooksByLibrary, libraryID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createBook = `-- name: CreateBook :one
 INSERT INTO book (library_id, folder_path, book_type, added_date)
 VALUES (?, ?, ?, datetime('now'))
@@ -96,6 +107,29 @@ DELETE FROM book_file WHERE id = ?
 func (q *Queries) DeleteBookFile(ctx context.Context, id int64) error {
 	_, err := q.db.ExecContext(ctx, deleteBookFile, id)
 	return err
+}
+
+const getBookByFolderPath = `-- name: GetBookByFolderPath :one
+SELECT id, library_id, folder_path, book_type, created_at, added_date FROM book WHERE library_id = ? AND folder_path = ? LIMIT 1
+`
+
+type GetBookByFolderPathParams struct {
+	LibraryID  int64          `json:"library_id"`
+	FolderPath sql.NullString `json:"folder_path"`
+}
+
+func (q *Queries) GetBookByFolderPath(ctx context.Context, arg GetBookByFolderPathParams) (Book, error) {
+	row := q.db.QueryRowContext(ctx, getBookByFolderPath, arg.LibraryID, arg.FolderPath)
+	var i Book
+	err := row.Scan(
+		&i.ID,
+		&i.LibraryID,
+		&i.FolderPath,
+		&i.BookType,
+		&i.CreatedAt,
+		&i.AddedDate,
+	)
+	return i, err
 }
 
 const getBookByID = `-- name: GetBookByID :one
@@ -531,6 +565,61 @@ func (q *Queries) ListBooksByLibrary(ctx context.Context, libraryID int64) ([]Bo
 			&i.BookType,
 			&i.CreatedAt,
 			&i.AddedDate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listBooksWithMetadata = `-- name: ListBooksWithMetadata :many
+SELECT b.id, b.library_id, b.book_type, b.added_date,
+       bm.title, bm.cover_path
+FROM book b
+LEFT JOIN book_metadata bm ON b.id = bm.book_id
+WHERE b.library_id = ?
+ORDER BY b.id
+LIMIT ? OFFSET ?
+`
+
+type ListBooksWithMetadataParams struct {
+	LibraryID int64 `json:"library_id"`
+	Limit     int64 `json:"limit"`
+	Offset    int64 `json:"offset"`
+}
+
+type ListBooksWithMetadataRow struct {
+	ID        int64          `json:"id"`
+	LibraryID int64          `json:"library_id"`
+	BookType  string         `json:"book_type"`
+	AddedDate sql.NullString `json:"added_date"`
+	Title     sql.NullString `json:"title"`
+	CoverPath sql.NullString `json:"cover_path"`
+}
+
+func (q *Queries) ListBooksWithMetadata(ctx context.Context, arg ListBooksWithMetadataParams) ([]ListBooksWithMetadataRow, error) {
+	rows, err := q.db.QueryContext(ctx, listBooksWithMetadata, arg.LibraryID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBooksWithMetadataRow{}
+	for rows.Next() {
+		var i ListBooksWithMetadataRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.LibraryID,
+			&i.BookType,
+			&i.AddedDate,
+			&i.Title,
+			&i.CoverPath,
 		); err != nil {
 			return nil, err
 		}

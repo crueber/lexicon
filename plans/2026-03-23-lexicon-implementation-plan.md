@@ -2087,21 +2087,21 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 06
 
 **Changes**:
-- `internal/library/scanner.go` — directory walker, supported extension detection
-- `internal/storage/fingerprint.go` — first 64KB + last 64KB → MD5
-- Book/book_file record creation logic
-- BOOK_PER_FILE and BOOK_PER_FOLDER organization modes
-- Audiobook folder detection (all audio files → AUDIOBOOK type)
-- Comic detection (CBZ/CBR/CB7 → COMIC type)
-- POST /api/libraries/{id}/scan endpoint (synchronous for now, task system comes later)
+- [x] `internal/library/scanner.go` — directory walker, supported extension detection
+- [x] `internal/storage/fingerprint.go` — first 64KB + last 64KB → MD5
+- [x] Book/book_file record creation logic
+- [x] BOOK_PER_FILE and BOOK_PER_FOLDER organization modes
+- [x] Audiobook folder detection (all audio files → AUDIOBOOK type)
+- [x] Comic detection (CBZ/CBR/CB7 → COMIC type)
+- [x] POST /api/libraries/{id}/scan endpoint (synchronous for now, task system comes later)
 
 **Verification**:
-- Create a library pointing to a directory with test ebook files
-- Trigger scan via API
-- Books appear in database with correct types
-- Fingerprints computed and stored
-- BOOK_PER_FOLDER mode groups files correctly
-- `go test ./...` passes (with test fixtures)
+- [x] Create a library pointing to a directory with test ebook files
+- [x] Trigger scan via API
+- [x] Books appear in database with correct types
+- [x] Fingerprints computed and stored
+- [x] BOOK_PER_FOLDER mode groups files correctly
+- [x] `go test ./...` passes (with test fixtures)
 
 ---
 

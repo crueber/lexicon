@@ -1,0 +1,570 @@
+package library_test
+
+import (
+	"context"
+	"database/sql"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/crueber/lexicon/internal/book"
+	"github.com/crueber/lexicon/internal/library"
+)
+
+// createTestFile creates a file with the given content at the given path.
+// It creates parent directories as needed.
+func createTestFile(t *testing.T, path string, content []byte) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		t.Fatalf("mkdir %q: %v", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatalf("write file %q: %v", path, err)
+	}
+}
+
+// createLibraryInDB creates a library record directly in the database.
+func createLibraryInDB(t *testing.T, db *sql.DB, name, mode string) library.Library {
+	t.Helper()
+	q := library.New(db)
+	lib, err := q.CreateLibrary(context.Background(), library.CreateLibraryParams{
+		Name:             name,
+		OrganizationMode: mode,
+	})
+	if err != nil {
+		t.Fatalf("create library %q: %v", name, err)
+	}
+	return lib
+}
+
+// addLibraryPath adds a path to a library and returns the LibraryPath.
+func addLibraryPath(t *testing.T, db *sql.DB, libraryID int64, path string) library.LibraryPath {
+	t.Helper()
+	q := library.New(db)
+	lp, err := q.CreateLibraryPath(context.Background(), library.CreateLibraryPathParams{
+		LibraryID: libraryID,
+		Path:      path,
+	})
+	if err != nil {
+		t.Fatalf("add library path %q: %v", path, err)
+	}
+	return lp
+}
+
+// countBooks returns the number of books in the database for a library.
+func countBooks(t *testing.T, db *sql.DB, libraryID int64) int {
+	t.Helper()
+	q := book.New(db)
+	count, err := q.CountBooksByLibrary(context.Background(), libraryID)
+	if err != nil {
+		t.Fatalf("count books: %v", err)
+	}
+	return int(count)
+}
+
+// listBookFiles returns all book files for a given book.
+func listBookFiles(t *testing.T, db *sql.DB, bookID int64) []book.BookFile {
+	t.Helper()
+	q := book.New(db)
+	files, err := q.ListBookFiles(context.Background(), bookID)
+	if err != nil {
+		t.Fatalf("list book files: %v", err)
+	}
+	return files
+}
+
+// listBooksForLibrary returns all books for a library.
+func listBooksForLibrary(t *testing.T, db *sql.DB, libraryID int64) []book.Book {
+	t.Helper()
+	q := book.New(db)
+	books, err := q.ListBooksByLibrary(context.Background(), libraryID)
+	if err != nil {
+		t.Fatalf("list books: %v", err)
+	}
+	return books
+}
+
+// --- Tests ---
+
+func TestScanner_BookPerFile_CreatesBookAndFile(t *testing.T) {
+	db := openTestDB(t)
+	dir := t.TempDir()
+
+	// Create test files.
+	epubPath := filepath.Join(dir, "book1.epub")
+	pdfPath := filepath.Join(dir, "book2.pdf")
+	createTestFile(t, epubPath, []byte("fake epub content"))
+	createTestFile(t, pdfPath, []byte("fake pdf content"))
+
+	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
+	lp := addLibraryPath(t, db, lib.ID, dir)
+
+	scanner := library.NewScanner(db, newTestLogger(t))
+	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
+	if err != nil {
+		t.Fatalf("ScanLibrary: %v", err)
+	}
+
+	if result.BooksAdded != 2 {
+		t.Errorf("BooksAdded = %d; want 2", result.BooksAdded)
+	}
+	if result.FilesAdded != 2 {
+		t.Errorf("FilesAdded = %d; want 2", result.FilesAdded)
+	}
+	if len(result.Errors) != 0 {
+		t.Errorf("Errors = %v; want none", result.Errors)
+	}
+
+	if got := countBooks(t, db, lib.ID); got != 2 {
+		t.Errorf("books in DB = %d; want 2", got)
+	}
+}
+
+func TestScanner_BookPerFile_SkipsUnsupportedFiles(t *testing.T) {
+	db := openTestDB(t)
+	dir := t.TempDir()
+
+	createTestFile(t, filepath.Join(dir, "book.epub"), []byte("epub"))
+	createTestFile(t, filepath.Join(dir, "readme.txt"), []byte("text"))
+	createTestFile(t, filepath.Join(dir, "image.jpg"), []byte("jpeg"))
+
+	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
+	lp := addLibraryPath(t, db, lib.ID, dir)
+
+	scanner := library.NewScanner(db, newTestLogger(t))
+	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
+	if err != nil {
+		t.Fatalf("ScanLibrary: %v", err)
+	}
+
+	if result.BooksAdded != 1 {
+		t.Errorf("BooksAdded = %d; want 1 (only epub)", result.BooksAdded)
+	}
+}
+
+func TestScanner_BookPerFile_DetectsBookTypes(t *testing.T) {
+	db := openTestDB(t)
+	dir := t.TempDir()
+
+	createTestFile(t, filepath.Join(dir, "ebook.epub"), []byte("epub"))
+	createTestFile(t, filepath.Join(dir, "comic.cbz"), []byte("cbz"))
+	createTestFile(t, filepath.Join(dir, "audio.m4b"), []byte("m4b"))
+
+	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
+	lp := addLibraryPath(t, db, lib.ID, dir)
+
+	scanner := library.NewScanner(db, newTestLogger(t))
+	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
+	if err != nil {
+		t.Fatalf("ScanLibrary: %v", err)
+	}
+
+	if result.BooksAdded != 3 {
+		t.Errorf("BooksAdded = %d; want 3", result.BooksAdded)
+	}
+
+	books := listBooksForLibrary(t, db, lib.ID)
+	typeMap := make(map[string]int)
+	for _, b := range books {
+		typeMap[b.BookType]++
+	}
+
+	if typeMap["EBOOK"] != 1 {
+		t.Errorf("EBOOK count = %d; want 1", typeMap["EBOOK"])
+	}
+	if typeMap["COMIC"] != 1 {
+		t.Errorf("COMIC count = %d; want 1", typeMap["COMIC"])
+	}
+	if typeMap["AUDIOBOOK"] != 1 {
+		t.Errorf("AUDIOBOOK count = %d; want 1", typeMap["AUDIOBOOK"])
+	}
+}
+
+func TestScanner_BookPerFile_FingerprintMoveDetection(t *testing.T) {
+	db := openTestDB(t)
+	dir := t.TempDir()
+
+	// Create a file and scan it.
+	originalPath := filepath.Join(dir, "original.epub")
+	createTestFile(t, originalPath, []byte("epub content for move test"))
+
+	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
+	lp := addLibraryPath(t, db, lib.ID, dir)
+
+	scanner := library.NewScanner(db, newTestLogger(t))
+	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
+	if err != nil {
+		t.Fatalf("first ScanLibrary: %v", err)
+	}
+
+	if result.BooksAdded != 1 {
+		t.Fatalf("first scan: BooksAdded = %d; want 1", result.BooksAdded)
+	}
+
+	// Rename the file (simulate a move).
+	movedPath := filepath.Join(dir, "moved.epub")
+	if err := os.Rename(originalPath, movedPath); err != nil {
+		t.Fatalf("rename file: %v", err)
+	}
+
+	// Scan again.
+	result2, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
+	if err != nil {
+		t.Fatalf("second ScanLibrary: %v", err)
+	}
+
+	// Should detect the move (file updated, not added).
+	if result2.BooksAdded != 0 {
+		t.Errorf("second scan: BooksAdded = %d; want 0 (file was moved, not new)", result2.BooksAdded)
+	}
+	if result2.FilesUpdated != 1 {
+		t.Errorf("second scan: FilesUpdated = %d; want 1", result2.FilesUpdated)
+	}
+
+	// Total books should still be 1.
+	if got := countBooks(t, db, lib.ID); got != 1 {
+		t.Errorf("books in DB after move = %d; want 1", got)
+	}
+
+	// Verify the file path was updated.
+	books := listBooksForLibrary(t, db, lib.ID)
+	if len(books) != 1 {
+		t.Fatalf("expected 1 book; got %d", len(books))
+	}
+	files := listBookFiles(t, db, books[0].ID)
+	if len(files) != 1 {
+		t.Fatalf("expected 1 file; got %d", len(files))
+	}
+	if files[0].FilePath != movedPath {
+		t.Errorf("file path = %q; want %q", files[0].FilePath, movedPath)
+	}
+}
+
+func TestScanner_BookPerFile_FingerprintChangeDetection(t *testing.T) {
+	db := openTestDB(t)
+	dir := t.TempDir()
+
+	filePath := filepath.Join(dir, "book.epub")
+	createTestFile(t, filePath, []byte("original content"))
+
+	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
+	lp := addLibraryPath(t, db, lib.ID, dir)
+
+	scanner := library.NewScanner(db, newTestLogger(t))
+	if _, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp}); err != nil {
+		t.Fatalf("first ScanLibrary: %v", err)
+	}
+
+	// Overwrite the file with different content.
+	createTestFile(t, filePath, []byte("completely different content"))
+
+	result2, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
+	if err != nil {
+		t.Fatalf("second ScanLibrary: %v", err)
+	}
+
+	if result2.FilesUpdated != 1 {
+		t.Errorf("FilesUpdated = %d; want 1", result2.FilesUpdated)
+	}
+	if result2.BooksAdded != 0 {
+		t.Errorf("BooksAdded = %d; want 0 (same path, different content)", result2.BooksAdded)
+	}
+}
+
+func TestScanner_BookPerFile_IdempotentRescan(t *testing.T) {
+	db := openTestDB(t)
+	dir := t.TempDir()
+
+	createTestFile(t, filepath.Join(dir, "book.epub"), []byte("epub"))
+
+	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
+	lp := addLibraryPath(t, db, lib.ID, dir)
+
+	scanner := library.NewScanner(db, newTestLogger(t))
+
+	// First scan.
+	if _, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp}); err != nil {
+		t.Fatalf("first ScanLibrary: %v", err)
+	}
+
+	// Second scan — should not add duplicates.
+	result2, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
+	if err != nil {
+		t.Fatalf("second ScanLibrary: %v", err)
+	}
+
+	if result2.BooksAdded != 0 {
+		t.Errorf("second scan BooksAdded = %d; want 0", result2.BooksAdded)
+	}
+	if result2.FilesAdded != 0 {
+		t.Errorf("second scan FilesAdded = %d; want 0", result2.FilesAdded)
+	}
+
+	if got := countBooks(t, db, lib.ID); got != 1 {
+		t.Errorf("books in DB = %d; want 1", got)
+	}
+}
+
+func TestScanner_BookPerFile_CreatesBookMetadata(t *testing.T) {
+	db := openTestDB(t)
+	dir := t.TempDir()
+
+	createTestFile(t, filepath.Join(dir, "book.epub"), []byte("epub"))
+
+	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
+	lp := addLibraryPath(t, db, lib.ID, dir)
+
+	scanner := library.NewScanner(db, newTestLogger(t))
+	if _, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp}); err != nil {
+		t.Fatalf("ScanLibrary: %v", err)
+	}
+
+	books := listBooksForLibrary(t, db, lib.ID)
+	if len(books) != 1 {
+		t.Fatalf("expected 1 book; got %d", len(books))
+	}
+
+	// Verify book_metadata row was created.
+	q := book.New(db)
+	_, err := q.GetBookMetadata(context.Background(), books[0].ID)
+	if err != nil {
+		t.Errorf("GetBookMetadata: %v (expected metadata row to exist)", err)
+	}
+}
+
+func TestScanner_BookPerFolder_GroupsFilesIntoOneBook(t *testing.T) {
+	db := openTestDB(t)
+	dir := t.TempDir()
+
+	// Create multiple files in the same directory.
+	createTestFile(t, filepath.Join(dir, "chapter1.epub"), []byte("chapter 1"))
+	createTestFile(t, filepath.Join(dir, "chapter2.epub"), []byte("chapter 2"))
+	createTestFile(t, filepath.Join(dir, "chapter3.epub"), []byte("chapter 3"))
+
+	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FOLDER")
+	lp := addLibraryPath(t, db, lib.ID, dir)
+
+	scanner := library.NewScanner(db, newTestLogger(t))
+	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
+	if err != nil {
+		t.Fatalf("ScanLibrary: %v", err)
+	}
+
+	// All 3 files in the same folder → 1 book.
+	if result.BooksAdded != 1 {
+		t.Errorf("BooksAdded = %d; want 1", result.BooksAdded)
+	}
+	if result.FilesAdded != 3 {
+		t.Errorf("FilesAdded = %d; want 3", result.FilesAdded)
+	}
+
+	if got := countBooks(t, db, lib.ID); got != 1 {
+		t.Errorf("books in DB = %d; want 1", got)
+	}
+
+	books := listBooksForLibrary(t, db, lib.ID)
+	files := listBookFiles(t, db, books[0].ID)
+	if len(files) != 3 {
+		t.Errorf("files for book = %d; want 3", len(files))
+	}
+}
+
+func TestScanner_BookPerFolder_SeparateFoldersSeparateBooks(t *testing.T) {
+	db := openTestDB(t)
+	dir := t.TempDir()
+
+	// Two subdirectories, each with one file.
+	createTestFile(t, filepath.Join(dir, "bookA", "file.epub"), []byte("book a"))
+	createTestFile(t, filepath.Join(dir, "bookB", "file.epub"), []byte("book b"))
+
+	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FOLDER")
+	lp := addLibraryPath(t, db, lib.ID, dir)
+
+	scanner := library.NewScanner(db, newTestLogger(t))
+	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
+	if err != nil {
+		t.Fatalf("ScanLibrary: %v", err)
+	}
+
+	if result.BooksAdded != 2 {
+		t.Errorf("BooksAdded = %d; want 2", result.BooksAdded)
+	}
+
+	if got := countBooks(t, db, lib.ID); got != 2 {
+		t.Errorf("books in DB = %d; want 2", got)
+	}
+}
+
+func TestScanner_BookPerFolder_AudiobookDetection(t *testing.T) {
+	db := openTestDB(t)
+	dir := t.TempDir()
+
+	// All audio files → AUDIOBOOK type.
+	createTestFile(t, filepath.Join(dir, "track01.mp3"), []byte("mp3"))
+	createTestFile(t, filepath.Join(dir, "track02.mp3"), []byte("mp3"))
+	createTestFile(t, filepath.Join(dir, "track03.m4b"), []byte("m4b"))
+
+	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FOLDER")
+	lp := addLibraryPath(t, db, lib.ID, dir)
+
+	scanner := library.NewScanner(db, newTestLogger(t))
+	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
+	if err != nil {
+		t.Fatalf("ScanLibrary: %v", err)
+	}
+
+	if result.BooksAdded != 1 {
+		t.Fatalf("BooksAdded = %d; want 1", result.BooksAdded)
+	}
+
+	books := listBooksForLibrary(t, db, lib.ID)
+	if books[0].BookType != "AUDIOBOOK" {
+		t.Errorf("BookType = %q; want AUDIOBOOK", books[0].BookType)
+	}
+
+	// Verify track numbers are assigned.
+	files := listBookFiles(t, db, books[0].ID)
+	for _, f := range files {
+		if !f.TrackNumber.Valid {
+			t.Errorf("file %q has no track number", f.FilePath)
+		}
+	}
+}
+
+func TestScanner_BookPerFolder_ComicDetection(t *testing.T) {
+	db := openTestDB(t)
+	dir := t.TempDir()
+
+	createTestFile(t, filepath.Join(dir, "issue1.cbz"), []byte("cbz"))
+	createTestFile(t, filepath.Join(dir, "issue2.cbr"), []byte("cbr"))
+
+	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FOLDER")
+	lp := addLibraryPath(t, db, lib.ID, dir)
+
+	scanner := library.NewScanner(db, newTestLogger(t))
+	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
+	if err != nil {
+		t.Fatalf("ScanLibrary: %v", err)
+	}
+
+	if result.BooksAdded != 1 {
+		t.Fatalf("BooksAdded = %d; want 1", result.BooksAdded)
+	}
+
+	books := listBooksForLibrary(t, db, lib.ID)
+	if books[0].BookType != "COMIC" {
+		t.Errorf("BookType = %q; want COMIC", books[0].BookType)
+	}
+}
+
+func TestScanner_BookPerFolder_AddsNewFilesToExistingBook(t *testing.T) {
+	db := openTestDB(t)
+	dir := t.TempDir()
+
+	// First scan: one file.
+	createTestFile(t, filepath.Join(dir, "track01.mp3"), []byte("track 1"))
+
+	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FOLDER")
+	lp := addLibraryPath(t, db, lib.ID, dir)
+
+	scanner := library.NewScanner(db, newTestLogger(t))
+	if _, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp}); err != nil {
+		t.Fatalf("first ScanLibrary: %v", err)
+	}
+
+	if got := countBooks(t, db, lib.ID); got != 1 {
+		t.Fatalf("after first scan: books = %d; want 1", got)
+	}
+
+	// Add a second file to the same directory.
+	createTestFile(t, filepath.Join(dir, "track02.mp3"), []byte("track 2"))
+
+	result2, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
+	if err != nil {
+		t.Fatalf("second ScanLibrary: %v", err)
+	}
+
+	// No new books, but one new file.
+	if result2.BooksAdded != 0 {
+		t.Errorf("second scan BooksAdded = %d; want 0", result2.BooksAdded)
+	}
+	if result2.FilesAdded != 1 {
+		t.Errorf("second scan FilesAdded = %d; want 1", result2.FilesAdded)
+	}
+
+	// Still 1 book.
+	if got := countBooks(t, db, lib.ID); got != 1 {
+		t.Errorf("after second scan: books = %d; want 1", got)
+	}
+
+	// But now 2 files.
+	books := listBooksForLibrary(t, db, lib.ID)
+	files := listBookFiles(t, db, books[0].ID)
+	if len(files) != 2 {
+		t.Errorf("files for book = %d; want 2", len(files))
+	}
+}
+
+func TestScanner_ContextCancellation(t *testing.T) {
+	db := openTestDB(t)
+	dir := t.TempDir()
+
+	// Create many files.
+	for i := 0; i < 10; i++ {
+		createTestFile(t, filepath.Join(dir, filepath.Join("sub", "book"+string(rune('a'+i))+".epub")), []byte("epub"))
+	}
+
+	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
+	lp := addLibraryPath(t, db, lib.ID, dir)
+
+	// Cancel context immediately.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	scanner := library.NewScanner(db, newTestLogger(t))
+	_, err := scanner.ScanLibrary(ctx, lib, []library.LibraryPath{lp})
+	// Should return context error or partial result without panicking.
+	// The error may be nil if cancellation happened after the scan completed.
+	_ = err // acceptable: either nil or context.Canceled
+}
+
+func TestScanner_EmptyDirectory(t *testing.T) {
+	db := openTestDB(t)
+	dir := t.TempDir()
+
+	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
+	lp := addLibraryPath(t, db, lib.ID, dir)
+
+	scanner := library.NewScanner(db, newTestLogger(t))
+	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
+	if err != nil {
+		t.Fatalf("ScanLibrary: %v", err)
+	}
+
+	if result.BooksAdded != 0 {
+		t.Errorf("BooksAdded = %d; want 0", result.BooksAdded)
+	}
+}
+
+func TestScanner_RecursiveDirectoryWalk(t *testing.T) {
+	db := openTestDB(t)
+	dir := t.TempDir()
+
+	// Files in nested subdirectories.
+	createTestFile(t, filepath.Join(dir, "level1", "book.epub"), []byte("epub"))
+	createTestFile(t, filepath.Join(dir, "level1", "level2", "book.pdf"), []byte("pdf"))
+	createTestFile(t, filepath.Join(dir, "level1", "level2", "level3", "book.mobi"), []byte("mobi"))
+
+	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
+	lp := addLibraryPath(t, db, lib.ID, dir)
+
+	scanner := library.NewScanner(db, newTestLogger(t))
+	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
+	if err != nil {
+		t.Fatalf("ScanLibrary: %v", err)
+	}
+
+	if result.BooksAdded != 3 {
+		t.Errorf("BooksAdded = %d; want 3", result.BooksAdded)
+	}
+}

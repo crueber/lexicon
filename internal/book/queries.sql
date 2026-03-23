@@ -103,5 +103,20 @@ ON CONFLICT(user_id, book_file_id) DO UPDATE SET
     progress_type = excluded.progress_type,
     updated_at = excluded.updated_at;
 
+-- name: GetBookByFolderPath :one
+SELECT * FROM book WHERE library_id = ? AND folder_path = ? LIMIT 1;
+
+-- name: ListBooksWithMetadata :many
+SELECT b.id, b.library_id, b.book_type, b.added_date,
+       bm.title, bm.cover_path
+FROM book b
+LEFT JOIN book_metadata bm ON b.id = bm.book_id
+WHERE b.library_id = ?
+ORDER BY b.id
+LIMIT ? OFFSET ?;
+
+-- name: CountBooksByLibrary :one
+SELECT COUNT(*) FROM book WHERE library_id = ?;
+
 -- name: GetProgress :one
 SELECT * FROM user_book_file_progress WHERE user_id = ? AND book_file_id = ? LIMIT 1;

@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/crueber/lexicon/internal/auth"
+	"github.com/crueber/lexicon/internal/book"
 	"github.com/crueber/lexicon/internal/library"
 	"github.com/crueber/lexicon/internal/user"
 )
@@ -27,6 +28,7 @@ type Server struct {
 	logger         *slog.Logger
 	authHandler    *auth.Handler
 	libraryHandler *library.Handler
+	bookHandler    *book.Handler
 }
 
 // New creates a new Server with the given configuration, opens the database,
@@ -45,6 +47,7 @@ func New(cfg Config) (*Server, error) {
 	}
 
 	librarySvc := library.NewService(db, logger)
+	libraryScanner := library.NewScanner(db, logger)
 
 	s := &Server{
 		cfg:            cfg,
@@ -52,7 +55,8 @@ func New(cfg Config) (*Server, error) {
 		router:         chi.NewRouter(),
 		logger:         logger,
 		authHandler:    auth.NewHandler(db, cfg.JWTSecret, logger),
-		libraryHandler: library.NewHandler(librarySvc, logger),
+		libraryHandler: library.NewHandler(librarySvc, libraryScanner, logger),
+		bookHandler:    book.NewHandler(db, logger),
 	}
 
 	if err := s.ensureDefaultAdmin(); err != nil {

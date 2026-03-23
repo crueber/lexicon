@@ -14,15 +14,17 @@ import (
 
 // Handler handles HTTP requests for library management.
 type Handler struct {
-	svc    *Service
-	logger *slog.Logger
+	svc     *Service
+	scanner *Scanner
+	logger  *slog.Logger
 }
 
 // NewHandler creates a new library Handler.
-func NewHandler(svc *Service, logger *slog.Logger) *Handler {
+func NewHandler(svc *Service, scanner *Scanner, logger *slog.Logger) *Handler {
 	return &Handler{
-		svc:    svc,
-		logger: logger,
+		svc:     svc,
+		scanner: scanner,
+		logger:  logger,
 	}
 }
 
@@ -275,8 +277,15 @@ func (h *Handler) handleDelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// ScanResponse is the JSON response for POST /api/libraries/{id}/scan.
+type ScanResponse struct {
+	BooksAdded   int `json:"booksAdded"`
+	FilesAdded   int `json:"filesAdded"`
+	FilesUpdated int `json:"filesUpdated"`
+	ErrorCount   int `json:"errorCount"`
+}
+
 // handleScan handles POST /api/libraries/{id}/scan.
-// This is a stub that returns 202 Accepted — the actual scanner is implemented in Phase 07.
 func (h *Handler) handleScan(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseID(w, r, "id")
 	if !ok {
@@ -290,7 +299,8 @@ func (h *Handler) handleScan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify the library exists and the user has access.
-	if _, err := h.svc.GetByID(r.Context(), id, p); err != nil {
+	lib, err := h.svc.GetByID(r.Context(), id, p)
+	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			writeError(w, http.StatusNotFound, "library not found")
 			return
@@ -304,7 +314,33 @@ func (h *Handler) handleScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusAccepted, map[string]string{"message": "scan queued"})
+	paths, err := h.svc.ListPaths(r.Context(), id)
+	if err != nil {
+		h.logger.Error("list paths for scan", "library_id", id, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	result, err := h.scanner.ScanLibrary(r.Context(), *lib, paths)
+	if err != nil {
+		h.logger.Error("scan library", "library_id", id, "error", err)
+		writeError(w, http.StatusInternalServerError, "scan failed")
+		return
+	}
+
+	h.logger.Info("library scan complete",
+		"library_id", id,
+		"books_added", result.BooksAdded,
+		"files_added", result.FilesAdded,
+		"errors", len(result.Errors),
+	)
+
+	writeJSON(w, http.StatusOK, ScanResponse{
+		BooksAdded:   result.BooksAdded,
+		FilesAdded:   result.FilesAdded,
+		FilesUpdated: result.FilesUpdated,
+		ErrorCount:   len(result.Errors),
+	})
 }
 
 // handleListPaths handles GET /api/libraries/{id}/paths.
