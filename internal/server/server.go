@@ -16,6 +16,7 @@ import (
 
 	"github.com/crueber/lexicon/internal/auth"
 	"github.com/crueber/lexicon/internal/book"
+	"github.com/crueber/lexicon/internal/dashboard"
 	"github.com/crueber/lexicon/internal/library"
 	"github.com/crueber/lexicon/internal/reader"
 	"github.com/crueber/lexicon/internal/shelf"
@@ -27,23 +28,24 @@ import (
 
 // Server is the main HTTP server for Lexicon.
 type Server struct {
-	cfg            Config
-	db             *sql.DB
-	router         *chi.Mux
-	logger         *slog.Logger
-	authHandler    *auth.Handler
-	userHandler    *user.Handler
-	libraryHandler *library.Handler
-	bookHandler    *book.Handler
-	storageHandler *storage.Handler
-	readerHandler  *reader.Handler
-	shelfHandler   *shelf.Handler
-	hub            *ws.Hub
-	wsHandler      *ws.Handler
-	watcher        *library.Watcher
-	taskRunner     *task.Runner
-	taskScheduler  *task.Scheduler
-	taskHandler    *task.Handler
+	cfg              Config
+	db               *sql.DB
+	router           *chi.Mux
+	logger           *slog.Logger
+	authHandler      *auth.Handler
+	userHandler      *user.Handler
+	libraryHandler   *library.Handler
+	bookHandler      *book.Handler
+	storageHandler   *storage.Handler
+	readerHandler    *reader.Handler
+	shelfHandler     *shelf.Handler
+	dashboardHandler *dashboard.Handler
+	hub              *ws.Hub
+	wsHandler        *ws.Handler
+	watcher          *library.Watcher
+	taskRunner       *task.Runner
+	taskScheduler    *task.Scheduler
+	taskHandler      *task.Handler
 }
 
 // New creates a new Server with the given configuration, opens the database,
@@ -130,23 +132,24 @@ func New(cfg Config) (*Server, error) {
 	)
 
 	s := &Server{
-		cfg:            cfg,
-		db:             db,
-		router:         chi.NewRouter(),
-		logger:         logger,
-		authHandler:    auth.NewHandler(db, cfg.JWTSecret, logger),
-		userHandler:    userHdlr,
-		libraryHandler: libraryHandler,
-		bookHandler:    bookHdlr,
-		storageHandler: storage.NewHandler(db, cfg.DataDir, logger),
-		readerHandler:  reader.NewHandler(db, logger),
-		shelfHandler:   shelfHdlr,
-		hub:            hub,
-		wsHandler:      wsHandler,
-		watcher:        watcher,
-		taskRunner:     taskRunner,
-		taskScheduler:  taskScheduler,
-		taskHandler:    taskHandler,
+		cfg:              cfg,
+		db:               db,
+		router:           chi.NewRouter(),
+		logger:           logger,
+		authHandler:      auth.NewHandler(db, cfg.JWTSecret, logger),
+		userHandler:      userHdlr,
+		libraryHandler:   libraryHandler,
+		bookHandler:      bookHdlr,
+		storageHandler:   storage.NewHandler(db, cfg.DataDir, logger),
+		readerHandler:    reader.NewHandler(db, logger),
+		shelfHandler:     shelfHdlr,
+		dashboardHandler: dashboard.NewHandler(db, logger),
+		hub:              hub,
+		wsHandler:        wsHandler,
+		watcher:          watcher,
+		taskRunner:       taskRunner,
+		taskScheduler:    taskScheduler,
+		taskHandler:      taskHandler,
 	}
 
 	if err := s.ensureDefaultAdmin(); err != nil {

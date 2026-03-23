@@ -2378,12 +2378,12 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 10
 
 **Changes**:
-- `internal/dashboard/handler.go` — GET /api/dashboard, PUT /api/dashboard/settings
-- `internal/dashboard/service.go` — row type resolution (LAST_READ, LATEST_ADDED, RANDOM)
-- `web/src/features/dashboard/Dashboard.tsx` — configurable rows
-- `web/src/features/dashboard/ScrollerRow.tsx` — horizontal book card scroller
-- Row configuration UI (enable/disable, reorder)
-- Route: /dashboard (default landing page after login)
+- [x] `internal/dashboard/handler.go` — GET /api/dashboard, PUT /api/dashboard/settings
+- [x] `internal/dashboard/service.go` — row type resolution (LAST_READ, LATEST_ADDED, RANDOM)
+- [x] `web/src/features/dashboard/Dashboard.tsx` — configurable rows
+- [x] `web/src/features/dashboard/ScrollerRow.tsx` — horizontal book card scroller
+- [x] Row configuration UI (enable/disable, reorder)
+- [x] Route: /dashboard (default landing page after login)
 
 **Verification**:
 - Dashboard shows configured rows

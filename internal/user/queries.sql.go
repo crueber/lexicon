@@ -303,6 +303,20 @@ func (q *Queries) RevokeRefreshToken(ctx context.Context, tokenHash string) erro
 	return err
 }
 
+const updateDashboardSetting = `-- name: UpdateDashboardSetting :exec
+UPDATE user_settings SET dashboard_setting = ? WHERE user_id = ?
+`
+
+type UpdateDashboardSettingParams struct {
+	DashboardSetting sql.NullString `json:"dashboard_setting"`
+	UserID           int64          `json:"user_id"`
+}
+
+func (q *Queries) UpdateDashboardSetting(ctx context.Context, arg UpdateDashboardSettingParams) error {
+	_, err := q.db.ExecContext(ctx, updateDashboardSetting, arg.DashboardSetting, arg.UserID)
+	return err
+}
+
 const updateEpubReaderSetting = `-- name: UpdateEpubReaderSetting :exec
 UPDATE user_settings SET epub_reader_setting = ? WHERE user_id = ?
 `

@@ -82,3 +82,6 @@ UPDATE user_settings SET epub_reader_setting = ? WHERE user_id = ?;
 
 -- name: UpdatePdfReaderSetting :exec
 UPDATE user_settings SET pdf_reader_setting = ? WHERE user_id = ?;
+
+-- name: UpdateDashboardSetting :exec
+UPDATE user_settings SET dashboard_setting = ? WHERE user_id = ?;
