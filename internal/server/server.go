@@ -13,14 +13,18 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/crueber/lexicon/internal/auth"
+	"github.com/crueber/lexicon/internal/user"
 )
 
 // Server is the main HTTP server for Lexicon.
 type Server struct {
-	cfg    Config
-	db     *sql.DB
-	router *chi.Mux
-	logger *slog.Logger
+	cfg         Config
+	db          *sql.DB
+	router      *chi.Mux
+	logger      *slog.Logger
+	authHandler *auth.Handler
 }
 
 // New creates a new Server with the given configuration, opens the database,
@@ -39,16 +43,53 @@ func New(cfg Config) (*Server, error) {
 	}
 
 	s := &Server{
-		cfg:    cfg,
-		db:     db,
-		router: chi.NewRouter(),
-		logger: logger,
+		cfg:         cfg,
+		db:          db,
+		router:      chi.NewRouter(),
+		logger:      logger,
+		authHandler: auth.NewHandler(db, cfg.JWTSecret, logger),
+	}
+
+	if err := s.ensureDefaultAdmin(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("ensure default admin: %w", err)
 	}
 
 	s.setupMiddleware()
 	s.setupRoutes()
 
 	return s, nil
+}
+
+// ensureDefaultAdmin checks if any users exist and creates a default admin
+// user if the database is empty. This enables first-run setup.
+func (s *Server) ensureDefaultAdmin() error {
+	ctx := context.Background()
+	q := user.New(s.db)
+
+	count, err := q.CountUsers(ctx)
+	if err != nil {
+		return fmt.Errorf("count users: %w", err)
+	}
+
+	if count > 0 {
+		return nil
+	}
+
+	_, err = user.CreateAdminUser(ctx, s.db, user.CreateUserServiceParams{
+		Username: "admin",
+		Password: "admin",
+		Name:     "Administrator",
+	})
+	if err != nil {
+		return fmt.Errorf("create default admin: %w", err)
+	}
+
+	s.logger.Warn("default admin user created — change the password immediately",
+		"username", "admin",
+	)
+
+	return nil
 }
 
 // Start begins listening for HTTP requests and shuts down gracefully on

@@ -1991,21 +1991,21 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 02
 
 **Changes**:
-- `internal/auth/jwt.go` — JWT issue/validate/refresh using `golang-jwt`
-- `internal/auth/middleware.go` — chi middleware: extract Bearer token, validate, inject Principal into context
-- `internal/auth/handler.go` — POST /api/auth/login, /api/auth/refresh, /api/auth/logout, GET /api/auth/me
-- `internal/auth/types.go` — Principal, Claims structs
-- `internal/user/service.go` — user lookup, password verification (bcrypt)
-- First-run setup: create default admin user if no users exist
-- `internal/server/routes.go` — register auth routes
+- [x] `internal/auth/jwt.go` — JWT issue/validate/refresh using `golang-jwt`
+- [x] `internal/auth/middleware.go` — chi middleware: extract Bearer token, validate, inject Principal into context
+- [x] `internal/auth/handler.go` — POST /api/auth/login, /api/auth/refresh, /api/auth/logout, GET /api/auth/me
+- [x] `internal/auth/types.go` — Principal, Claims structs
+- [x] `internal/user/service.go` — user lookup, password verification (bcrypt)
+- [x] First-run setup: create default admin user if no users exist
+- [x] `internal/server/routes.go` — register auth routes
 
 **Verification**:
-- POST /api/auth/login with valid credentials returns JWT + refresh token
-- GET /api/auth/me with valid JWT returns user info
-- GET /api/auth/me without JWT returns 401
-- POST /api/auth/refresh rotates tokens
-- POST /api/auth/logout revokes refresh token
-- Default admin user created on first run
+- [x] POST /api/auth/login with valid credentials returns JWT + refresh token
+- [x] GET /api/auth/me with valid JWT returns user info
+- [x] GET /api/auth/me without JWT returns 401
+- [x] POST /api/auth/refresh rotates tokens
+- [x] POST /api/auth/logout revokes refresh token
+- [x] Default admin user created on first run
 
 ---
 

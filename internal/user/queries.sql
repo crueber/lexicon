@@ -58,6 +58,15 @@ UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ?;
 -- name: GetAppSetting :one
 SELECT value FROM app_settings WHERE key = ?;
 
+-- name: CountUsers :one
+SELECT COUNT(*) FROM users;
+
+-- name: UpdateUserPassword :exec
+UPDATE users SET password_hash = ? WHERE id = ?;
+
+-- name: DeleteExpiredRefreshTokens :exec
+DELETE FROM refresh_tokens WHERE expires_at < datetime('now') OR revoked = 1;
+
 -- name: UpsertAppSetting :exec
 INSERT INTO app_settings (key, value) VALUES (?, ?)
 ON CONFLICT(key) DO UPDATE SET value = excluded.value;

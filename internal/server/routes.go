@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+
+	"github.com/crueber/lexicon/internal/auth"
+	"github.com/go-chi/chi/v5"
 )
 
 // setupRoutes registers all HTTP routes on the router.
@@ -13,8 +16,22 @@ func (s *Server) setupRoutes() {
 	// Health check endpoint.
 	s.router.Get("/health", s.handleHealth)
 
-	// API routes will be mounted here in future phases.
-	// s.router.Route("/api", func(r chi.Router) { ... })
+	// API routes.
+	s.router.Route("/api", func(r chi.Router) {
+		// Auth routes (public).
+		r.Route("/auth", func(r chi.Router) {
+			r.Post("/login", s.authHandler.HandleLogin)
+			r.Post("/refresh", s.authHandler.HandleRefresh)
+			r.Post("/logout", s.authHandler.HandleLogout)
+
+			// Protected auth routes.
+			r.Group(func(r chi.Router) {
+				r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+				r.Get("/me", s.authHandler.HandleMe)
+				r.Patch("/me/password", s.authHandler.HandleChangePassword)
+			})
+		})
+	})
 
 	// Frontend: proxy to Vite in dev mode, serve embedded files in production.
 	if s.cfg.DevMode {

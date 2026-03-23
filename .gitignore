@@ -1,5 +1,5 @@
 # Binaries
-lexicon
+/lexicon
 *.exe
 *.exe~
 *.dll
