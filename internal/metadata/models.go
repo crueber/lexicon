@@ -150,6 +150,21 @@ type LibraryPath struct {
 	Path      string `json:"path"`
 }
 
+type MagicShelf struct {
+	ID          int64          `json:"id"`
+	UserID      int64          `json:"user_id"`
+	Name        string         `json:"name"`
+	Description sql.NullString `json:"description"`
+	Icon        sql.NullString `json:"icon"`
+	IconColor   sql.NullString `json:"icon_color"`
+	Rules       string         `json:"rules"`
+	SortField   string         `json:"sort_field"`
+	SortDir     string         `json:"sort_dir"`
+	LimitCount  sql.NullInt64  `json:"limit_count"`
+	CreatedAt   string         `json:"created_at"`
+	UpdatedAt   string         `json:"updated_at"`
+}
+
 type MetadataFetchJob struct {
 	ID        int64          `json:"id"`
 	BookID    int64          `json:"book_id"`

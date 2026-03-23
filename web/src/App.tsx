@@ -25,6 +25,8 @@ import PdfReader from "./features/reader/PdfReader";
 import ReaderDispatch from "./features/reader/ReaderDispatch";
 import ShelfList from "./features/shelf/ShelfList";
 import ShelfDetail from "./features/shelf/ShelfDetail";
+import MagicShelfBuilder from "./features/shelf/MagicShelfBuilder";
+import MagicShelfDetail from "./features/shelf/MagicShelfDetail";
 import UserManagement from "./features/admin/UserManagement";
 import ToastContainer from "./shared/ui/Toast";
 import WSProvider from "./shared/ws/WSProvider";
@@ -267,6 +269,9 @@ const App: Component = () => {
         <Route path="/books/:id" component={BookDetail} />
         <Route path="/shelves" component={ShelfList} />
         <Route path="/shelves/:id" component={ShelfDetail} />
+        <Route path="/magic-shelves/new" component={MagicShelfBuilder} />
+        <Route path="/magic-shelves/:id" component={MagicShelfDetail} />
+        <Route path="/magic-shelves/:id/edit" component={MagicShelfBuilder} />
         <Route path="/notebook" component={NotebookStub} />
         <Route path="/settings" component={SettingsPage} />
         <Route path="/admin/users" component={UserManagement} />

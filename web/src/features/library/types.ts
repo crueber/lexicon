@@ -111,3 +111,40 @@ export interface ShelfBook {
   addedAt: string;
   sortOrder: number;
 }
+
+export interface RuleItem {
+  type: "condition" | "group";
+  field?: string;
+  operator?: string;
+  value?: string;
+  group?: RuleGroup;
+}
+
+export interface RuleGroup {
+  operator: "AND" | "OR";
+  rules: RuleItem[];
+}
+
+export interface MagicShelf {
+  id: number;
+  userId: number;
+  name: string;
+  description?: string;
+  icon?: string;
+  iconColor?: string;
+  rules: string; // JSON-encoded RuleGroup
+  sortField: string;
+  sortDir: "ASC" | "DESC";
+  limitCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MagicShelfBook {
+  id: number;
+  libraryId: number;
+  bookType: string;
+  title?: string;
+  coverPath?: string;
+  addedDate?: string;
+}

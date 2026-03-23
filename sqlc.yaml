@@ -46,7 +46,9 @@ sql:
         emit_json_tags: true
         emit_empty_slices: true
   - engine: "sqlite"
-    queries: "internal/shelf/queries.sql"
+    queries:
+      - "internal/shelf/queries.sql"
+      - "internal/shelf/magic_queries.sql"
     schema: "migrations/"
     gen:
       go:

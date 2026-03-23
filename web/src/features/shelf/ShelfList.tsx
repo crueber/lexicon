@@ -8,17 +8,21 @@ import {
   ErrorBoundary,
 } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { BookMarked, Plus, X } from "lucide-solid";
+import { BookMarked, Plus, X, Wand2 } from "lucide-solid";
 import { api } from "../../shared/api/client";
 import Button from "../../shared/ui/Button";
 import Input from "../../shared/ui/Input";
 import Skeleton from "../../shared/ui/Skeleton";
-import type { Shelf } from "../library/types";
+import type { Shelf, MagicShelf } from "../library/types";
 
 // ---- API ----
 
 async function fetchShelves(): Promise<Shelf[]> {
   return api<Shelf[]>("/shelves");
+}
+
+async function fetchMagicShelves(): Promise<MagicShelf[]> {
+  return api<MagicShelf[]>("/magic-shelves");
 }
 
 async function createShelf(params: {
@@ -192,12 +196,51 @@ const ShelfListSkeleton: Component = () => (
   </div>
 );
 
+// ---- Magic Shelf Card ----
+
+const MagicShelfCard: Component<{ shelf: MagicShelf; onClick: () => void }> = (props) => (
+  <button
+    onClick={props.onClick}
+    class="group flex flex-col gap-3 rounded-xl bg-slate-800 p-5 text-left transition-colors hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+  >
+    <div class="flex items-center gap-3">
+      <div
+        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xl"
+        style={{
+          "background-color": props.shelf.iconColor
+            ? `${props.shelf.iconColor}33`
+            : undefined,
+        }}
+      >
+        <Show when={props.shelf.icon} fallback={<Wand2 class="h-5 w-5 text-indigo-400" />}>
+          <span>{props.shelf.icon}</span>
+        </Show>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2">
+          <p class="truncate font-semibold text-slate-100 group-hover:text-white">
+            {props.shelf.name}
+          </p>
+          <span class="shrink-0 rounded-full bg-indigo-600/20 px-1.5 py-0.5 text-[10px] font-medium text-indigo-400">
+            Magic
+          </span>
+        </div>
+        <p class="text-sm text-slate-400">Dynamic collection</p>
+      </div>
+    </div>
+    <Show when={props.shelf.description}>
+      <p class="line-clamp-2 text-sm text-slate-400">{props.shelf.description}</p>
+    </Show>
+  </button>
+);
+
 // ---- Inner component ----
 
 const ShelfListInner: Component = () => {
   const navigate = useNavigate();
   const [showCreate, setShowCreate] = createSignal(false);
   const [shelves, { refetch }] = createResource(fetchShelves);
+  const [magicShelves] = createResource(fetchMagicShelves);
 
   function handleCreated() {
     setShowCreate(false);
@@ -218,14 +261,25 @@ const ShelfListInner: Component = () => {
             )}
           </Show>
         </div>
-        <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
-          <Plus class="h-4 w-4" />
-          New Shelf
-        </Button>
+        <div class="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/magic-shelves/new")}
+          >
+            <Wand2 class="h-4 w-4" />
+            New Magic Shelf
+          </Button>
+          <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
+            <Plus class="h-4 w-4" />
+            New Shelf
+          </Button>
+        </div>
       </div>
 
       {/* Content */}
-      <div class="flex-1 p-6">
+      <div class="flex-1 overflow-y-auto p-6">
+        {/* Regular shelves */}
         <Show
           when={!shelves.loading}
           fallback={<ShelfListSkeleton />}
@@ -233,7 +287,7 @@ const ShelfListInner: Component = () => {
           <Show
             when={(shelves() ?? []).length > 0}
             fallback={
-              <div class="flex flex-col items-center justify-center gap-4 py-20 text-center">
+              <div class="flex flex-col items-center justify-center gap-4 py-12 text-center">
                 <BookMarked class="h-12 w-12 text-slate-600" />
                 <div>
                   <p class="text-lg font-medium text-slate-300">No shelves yet</p>
@@ -259,6 +313,28 @@ const ShelfListInner: Component = () => {
               </For>
             </div>
           </Show>
+        </Show>
+
+        {/* Magic shelves section */}
+        <Show when={(magicShelves() ?? []).length > 0}>
+          <div class="mt-8">
+            <div class="mb-4 flex items-center gap-2">
+              <Wand2 class="h-4 w-4 text-indigo-400" />
+              <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">
+                Magic Shelves
+              </h2>
+            </div>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <For each={magicShelves() ?? []}>
+                {(ms) => (
+                  <MagicShelfCard
+                    shelf={ms}
+                    onClick={() => navigate(`/magic-shelves/${ms.id}`)}
+                  />
+                )}
+              </For>
+            </div>
+          </div>
         </Show>
       </div>
 

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+
+	"github.com/crueber/lexicon/internal/auth"
 )
 
 // ErrNotFound is returned when a shelf does not exist.
@@ -270,6 +272,38 @@ func (s *Service) ListBooks(ctx context.Context, shelfID, userID int64) ([]ListB
 	}
 
 	return books, nil
+}
+
+// getUserLibraryIDs returns the library IDs accessible to the given principal.
+// Admins have access to all libraries; regular users have access to their permitted libraries.
+func (s *Service) getUserLibraryIDs(ctx context.Context, principal *auth.Principal) ([]int64, error) {
+	if principal.IsAdmin() {
+		// Admins have access to all libraries — query all library IDs.
+		rows, err := s.db.QueryContext(ctx, "SELECT id FROM library ORDER BY id")
+		if err != nil {
+			return nil, fmt.Errorf("list all library ids: %w", err)
+		}
+		defer rows.Close()
+
+		var ids []int64
+		for rows.Next() {
+			var id int64
+			if err := rows.Scan(&id); err != nil {
+				return nil, fmt.Errorf("scan library id: %w", err)
+			}
+			ids = append(ids, id)
+		}
+		if err := rows.Close(); err != nil {
+			return nil, fmt.Errorf("close rows: %w", err)
+		}
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("rows error: %w", err)
+		}
+		return ids, nil
+	}
+
+	// Regular user: use the library IDs from the principal (set during auth).
+	return principal.LibraryIDs, nil
 }
 
 // ListShelvesContainingBook returns shelves (owned by user) that contain a book.

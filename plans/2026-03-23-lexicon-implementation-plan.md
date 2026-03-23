@@ -2454,22 +2454,26 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 16
 
 **Changes**:
-- `migrations/010_magic_shelves.up.sql` — magic_shelf table
-- `internal/shelf/magic.go` — rule evaluation engine (SQL WHERE builder)
-- `internal/shelf/handler.go` — magic shelf CRUD, evaluate rules
-- `web/src/features/shelf/MagicShelfBuilder.tsx` — visual rule builder
-- Field type selector, operator selector, value input
-- AND/OR group nesting (up to 3 levels)
-- Live preview count of matching books
-- Routes: /magic-shelves, /magic-shelves/{id}
+- [x] `migrations/009_magic_shelves.up.sql` — magic_shelf table
+- [x] `internal/shelf/magic.go` — rule evaluation engine (SQL WHERE builder)
+- [x] `internal/shelf/magic_handler.go` — magic shelf CRUD, evaluate rules
+- [x] `internal/shelf/magic_queries.sql` — sqlc queries for magic shelves
+- [x] `internal/shelf/magic_test.go` — tests for BuildQuery rule engine
+- [x] `web/src/features/shelf/MagicShelfBuilder.tsx` — visual rule builder
+- [x] Field type selector, operator selector, value input
+- [x] AND/OR group nesting (up to 3 levels)
+- [x] Live preview count of matching books
+- [x] `web/src/features/shelf/MagicShelfDetail.tsx` — magic shelf detail page
+- [x] `web/src/features/shelf/ShelfList.tsx` — updated to show magic shelves section
+- [x] Routes: /magic-shelves/new, /magic-shelves/{id}, /magic-shelves/{id}/edit
 
 **Verification**:
-- Create magic shelf with rules (e.g., author CONTAINS "Sanderson" AND category EQUALS "Fantasy")
-- Shelf shows matching books
-- Edit rules → results update
-- Nested AND/OR groups work
-- Live preview count matches actual results
-- All supported fields and operators work
+- [x] Create magic shelf with rules (e.g., author CONTAINS "Sanderson" AND category EQUALS "Fantasy")
+- [x] Shelf shows matching books
+- [x] Edit rules → results update
+- [x] Nested AND/OR groups work
+- [x] Live preview count matches actual results
+- [x] All supported fields and operators work
 
 ---
 
