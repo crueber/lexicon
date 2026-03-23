@@ -2016,22 +2016,22 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 03
 
 **Changes**:
-- `web/src/shared/api/client.ts` — typed fetch wrapper with auth header injection, token refresh
-- `web/src/features/auth/AuthProvider.tsx` — auth context with signals (user, login, logout, isAdmin)
-- `web/src/features/auth/LoginPage.tsx` — login form
-- `web/src/features/auth/ProtectedRoute.tsx` — redirect to /login if not authenticated
-- `web/src/shared/ui/` — Button, Input components (Kobalte-based)
-- App layout shell: sidebar navigation + main content area
-- `web/src/App.tsx` — router setup with protected routes
-- Dashboard stub page (placeholder)
+- [x] `web/src/shared/api/client.ts` — typed fetch wrapper with auth header injection, token refresh
+- [x] `web/src/features/auth/AuthProvider.tsx` — auth context with signals (user, login, logout, isAdmin)
+- [x] `web/src/features/auth/LoginPage.tsx` — login form
+- [x] `web/src/features/auth/ProtectedRoute.tsx` — redirect to /login if not authenticated
+- [x] `web/src/shared/ui/` — Button, Input components (Kobalte-based)
+- [x] App layout shell: sidebar navigation + main content area
+- [x] `web/src/App.tsx` — router setup with protected routes
+- [x] Dashboard stub page (placeholder)
 
 **Verification**:
-- Browser shows login page at /login
-- Can log in with default admin credentials
-- Redirected to dashboard stub after login
-- Sidebar navigation visible
-- Unauthenticated access redirects to /login
-- Token refresh works transparently
+- [ ] Browser shows login page at /login
+- [ ] Can log in with default admin credentials
+- [ ] Redirected to dashboard stub after login
+- [ ] Sidebar navigation visible
+- [ ] Unauthenticated access redirects to /login
+- [ ] Token refresh works transparently
 
 ---
 
