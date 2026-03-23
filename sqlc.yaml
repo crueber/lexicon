@@ -9,3 +9,21 @@ sql:
         out: "internal/user"
         emit_json_tags: true
         emit_empty_slices: true
+  - engine: "sqlite"
+    queries: "internal/library/queries.sql"
+    schema: "migrations/"
+    gen:
+      go:
+        package: "library"
+        out: "internal/library"
+        emit_json_tags: true
+        emit_empty_slices: true
+  - engine: "sqlite"
+    queries: "internal/book/queries.sql"
+    schema: "migrations/"
+    gen:
+      go:
+        package: "book"
+        out: "internal/book"
+        emit_json_tags: true
+        emit_empty_slices: true

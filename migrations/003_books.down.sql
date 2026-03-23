@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS comic_metadata;
+DROP TABLE IF EXISTS book_metadata;
+DROP TABLE IF EXISTS book_file;
+DROP TABLE IF EXISTS book;
