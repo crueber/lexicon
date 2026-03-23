@@ -2189,20 +2189,20 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 10
 
 **Changes**:
-- Book detail API: GET /api/books/{id} — returns full metadata, files, authors, series, categories, tags
-- `web/src/features/book/BookDetail.tsx` — full detail page
-- Large cover display
-- Metadata fields: title, authors (linked), series, publisher, date, language, ISBN, page count
-- Truncatable description
-- File list with format badges
-- Route: /books/{id}
+- [x] Book detail API: GET /api/books/{id} — returns full metadata, files, authors, series, categories, tags
+- [x] `web/src/features/book/BookDetail.tsx` — full detail page
+- [x] Large cover display
+- [x] Metadata fields: title, authors (linked), series, publisher, date, language, ISBN, page count
+- [x] Truncatable description
+- [x] File list with format badges
+- [x] Route: /books/{id}
 
 **Verification**:
-- Book detail page shows all metadata
-- Authors and series are clickable links
-- File list shows all associated files with formats
-- Cover displays correctly
-- Description truncates with "show more"
+- [ ] Book detail page shows all metadata
+- [ ] Authors and series are clickable links
+- [ ] File list shows all associated files with formats
+- [ ] Cover displays correctly
+- [ ] Description truncates with "show more"
 
 ---
 
@@ -2213,20 +2213,20 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 07, Phase 04
 
 **Changes**:
-- `internal/ws/hub.go` — WebSocket connection hub (register, unregister, broadcast)
-- `internal/ws/handler.go` — /ws upgrade endpoint with JWT auth
-- `internal/library/watcher.go` — fsnotify watch on all library paths, debounce 5s
-- `web/src/shared/ws/socket.ts` — reconnecting WebSocket client
-- WebSocket events: BOOK_ADDED, BOOK_UPDATED, BOOK_DELETED, LIBRARY_SCAN_COMPLETE
-- Frontend reacts to WebSocket events (update book store)
+- [x] `internal/ws/hub.go` — WebSocket connection hub (register, unregister, broadcast)
+- [x] `internal/ws/handler.go` — /ws upgrade endpoint with JWT auth
+- [x] `internal/library/watcher.go` — fsnotify watch on all library paths, debounce 5s
+- [x] `web/src/shared/ws/socket.ts` — reconnecting WebSocket client
+- [x] WebSocket events: BOOK_ADDED, BOOK_UPDATED, BOOK_DELETED, LIBRARY_SCAN_COMPLETE
+- [x] Frontend reacts to WebSocket events (update book store)
 
 **Verification**:
-- WebSocket connects with valid JWT
-- Add a file to a watched library directory
-- After debounce, file is scanned
-- BOOK_ADDED event received by frontend
-- UI updates without page refresh
-- WebSocket reconnects after disconnect
+- [ ] WebSocket connects with valid JWT
+- [ ] Add a file to a watched library directory
+- [ ] After debounce, file is scanned
+- [ ] BOOK_ADDED event received by frontend
+- [ ] UI updates without page refresh
+- [ ] WebSocket reconnects after disconnect
 
 ---
 
@@ -2237,23 +2237,23 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 12
 
 **Changes**:
-- `migrations/007_tasks.up.sql` — tasks, task_cron_configuration tables
-- `internal/task/runner.go` — task execution with context cancellation, progress reporting
-- `internal/task/scheduler.go` — robfig/cron integration
-- `internal/task/handler.go` — GET /api/tasks, POST /api/tasks/{type}/run, DELETE /api/tasks/{id}
-- `internal/task/types.go` — task type definitions
-- LIBRARY_SCAN converted to a background task
-- TASK_PROGRESS/COMPLETE/FAILED WebSocket events
-- On startup: mark interrupted RUNNING tasks as FAILED
+- [x] `migrations/006_tasks.up.sql` — tasks, task_cron_configuration tables
+- [x] `internal/task/runner.go` — task execution with context cancellation, progress reporting
+- [x] `internal/task/scheduler.go` — robfig/cron integration
+- [x] `internal/task/handler.go` — GET /api/tasks, POST /api/tasks/{type}/run, DELETE /api/tasks/{id}
+- [x] `internal/task/types.go` — task type definitions
+- [x] LIBRARY_SCAN converted to a background task
+- [x] TASK_PROGRESS/COMPLETE/FAILED WebSocket events
+- [x] On startup: mark interrupted RUNNING tasks as FAILED
 
 **Verification**:
-- Trigger LIBRARY_SCAN task via API
-- Task progress events received via WebSocket
-- Task completes and status updated in DB
-- Can cancel a running task
-- Cron schedules fire correctly
-- Only one instance of each task type runs at a time
-- `go test ./...` passes
+- [ ] Trigger LIBRARY_SCAN task via API
+- [ ] Task progress events received via WebSocket
+- [ ] Task completes and status updated in DB
+- [ ] Can cancel a running task
+- [ ] Cron schedules fire correctly
+- [ ] Only one instance of each task type runs at a time
+- [x] `go test ./...` passes
 
 ---
 
@@ -2264,23 +2264,23 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 11
 
 **Changes**:
-- `internal/reader/handler.go` — file streaming endpoint (range requests), progress save/load
-- `web/src/features/reader/EpubReader.tsx` — epub.js integration
-- Full-screen reading mode
-- Top bar: book title, chapter title, progress %
-- Bottom toolbar: font settings, theme, TOC, bookmarks panel
-- CFI-based progress auto-save
-- Settings panel: font, size, line height, margins, flow, theme
-- Settings stored in user_settings.epub_reader_setting
-- Route: /books/{id}/read/epub
+- [x] `internal/reader/handler.go` — file streaming endpoint (range requests), progress save/load
+- [x] `web/src/features/reader/EpubReader.tsx` — epub.js integration
+- [x] Full-screen reading mode
+- [x] Top bar: book title, chapter title, progress %
+- [x] Bottom toolbar: font settings, theme, TOC, bookmarks panel
+- [x] CFI-based progress auto-save
+- [x] Settings panel: font, size, line height, margins, flow, theme
+- [x] Settings stored in user_settings.epub_reader_setting
+- [x] Route: /books/{id}/read/epub
 
 **Verification**:
-- Open an EPUB book in the reader
-- Navigate between chapters
-- Close and reopen — resumes at same position (CFI)
-- Font/theme settings persist
-- TOC navigation works
-- Full-screen mode works
+- [ ] Open an EPUB book in the reader
+- [ ] Navigate between chapters
+- [ ] Close and reopen — resumes at same position (CFI)
+- [ ] Font/theme settings persist
+- [ ] TOC navigation works
+- [ ] Full-screen mode works
 
 ---
 
@@ -2293,20 +2293,20 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Parallelizable with**: Phase 14
 
 **Changes**:
-- `web/src/features/reader/PdfReader.tsx` — pdfjs-dist integration
-- Page-based progress save/restore
-- Sidebar: thumbnails, TOC, search
-- Settings: spread mode, scroll mode, zoom level
-- Settings stored in user_settings.pdf_reader_setting
-- Route: /books/{id}/read/pdf
+- [x] `web/src/features/reader/PdfReader.tsx` — pdfjs-dist integration
+- [x] Page-based progress save/restore
+- [x] Sidebar: thumbnails, TOC, search
+- [x] Settings: spread mode, scroll mode, zoom level
+- [x] Settings stored in user_settings.pdf_reader_setting
+- [x] Route: /books/{id}/read/pdf
 
 **Verification**:
-- Open a PDF book in the reader
-- Navigate between pages
-- Close and reopen — resumes at same page
-- Sidebar thumbnails and TOC work
-- Search within PDF works
-- Settings persist
+- [ ] Open a PDF book in the reader
+- [ ] Navigate between pages
+- [ ] Close and reopen — resumes at same page
+- [ ] Sidebar thumbnails and TOC work
+- [ ] Search within PDF works
+- [ ] Settings persist
 
 ---
 
