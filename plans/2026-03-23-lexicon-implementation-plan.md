@@ -2430,11 +2430,11 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 19
 
 **Changes**:
-- Hardcover provider (GraphQL API)
-- Amazon provider (scraper with rate limiting)
-- GoodReads provider (scraper with rate limiting)
-- Audible provider (scraper, audiobook-focused)
-- ComicVine provider (REST API)
+- [x] Hardcover provider (GraphQL API)
+- [x] Amazon provider (replaced with OpenLibrary — free, no API key, no legal risk)
+- [x] GoodReads provider (replaced with OpenLibrary — free, no API key, no legal risk)
+- [x] Audible provider (stub — no public API, scraping blocked aggressively)
+- [x] ComicVine provider (REST API)
 - Per-field priority matrix implementation
 - Metadata provider UI in admin settings
 

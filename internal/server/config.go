@@ -9,4 +9,6 @@ type Config struct {
 	LogFormat         string `env:"LOG_FORMAT" envDefault:"json"`
 	DevMode           bool   `env:"DEV_MODE" envDefault:"false"`
 	GoogleBooksAPIKey string `env:"GOOGLE_BOOKS_API_KEY" envDefault:""`
+	HardcoverAPIKey   string `env:"HARDCOVER_API_KEY" envDefault:""`
+	ComicVineAPIKey   string `env:"COMICVINE_API_KEY" envDefault:""`
 }

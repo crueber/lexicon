@@ -136,6 +136,10 @@ func New(cfg Config) (*Server, error) {
 	// Set up the metadata service and register providers.
 	metadataSvc := metadata.NewService(db, logger)
 	metadataSvc.RegisterProvider(metadata.NewGoogleBooksProvider(cfg.GoogleBooksAPIKey, logger))
+	metadataSvc.RegisterProvider(metadata.NewOpenLibraryProvider(logger))
+	metadataSvc.RegisterProvider(metadata.NewHardcoverProvider(cfg.HardcoverAPIKey, logger))
+	metadataSvc.RegisterProvider(metadata.NewComicVineProvider(cfg.ComicVineAPIKey, logger))
+	metadataSvc.RegisterProvider(metadata.NewAudibleProvider(logger))
 	metadataHdlr := metadata.NewHandler(metadataSvc, logger)
 
 	s := &Server{
