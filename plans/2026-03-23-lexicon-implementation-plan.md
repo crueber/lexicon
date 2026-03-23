@@ -1943,22 +1943,22 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Goal**: Working build pipeline that produces a single binary serving a "Hello Lexicon" page.
 
 **Changes**:
-- `go.mod` with module `github.com/crueber/lexicon`
-- `cmd/lexicon/main.go` — thin entry point with `run()` pattern
-- `internal/server/server.go` — chi router, health check endpoint
-- `Makefile` — targets: `build`, `run`, `test`, `lint`, `sqlc-generate`
-- `web/` — Vite + SolidJS + TypeScript + Tailwind scaffold
-- `web/src/App.tsx` — "Hello Lexicon" page
-- `Dockerfile` — multi-stage build
-- `go:embed` for serving frontend dist in production
-- Dev mode: proxy Vite dev server
+- [x] `go.mod` with module `github.com/crueber/lexicon`
+- [x] `cmd/lexicon/main.go` — thin entry point with `run()` pattern
+- [x] `internal/server/server.go` — chi router, health check endpoint
+- [x] `Makefile` — targets: `build`, `run`, `test`, `lint`, `sqlc-generate`
+- [x] `web/` — Vite + SolidJS + TypeScript + Tailwind scaffold
+- [x] `web/src/App.tsx` — "Hello Lexicon" page
+- [x] `Dockerfile` — multi-stage build
+- [x] `go:embed` for serving frontend dist in production
+- [x] Dev mode: proxy Vite dev server
 
 **Verification**:
-- `make build` succeeds
-- `make run` starts server on :6060
-- `curl http://localhost:6060/health` returns 200
-- Browser shows "Hello Lexicon" page
-- `docker build .` succeeds
+- [x] `make build` succeeds
+- [ ] `make run` starts server on :6060
+- [ ] `curl http://localhost:6060/health` returns 200
+- [ ] Browser shows "Hello Lexicon" page
+- [ ] `docker build .` succeeds
 
 ---
 

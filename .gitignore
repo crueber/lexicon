@@ -21,6 +21,10 @@ lexicon
 web/node_modules/
 web/dist/
 web/.vite/
+web/tsconfig.tsbuildinfo
+
+# Embedded frontend (copied from web/dist during build)
+internal/server/dist/
 
 # Environment / secrets
 .env
