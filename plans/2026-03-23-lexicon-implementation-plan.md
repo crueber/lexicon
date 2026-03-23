@@ -2163,22 +2163,22 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 04, Phase 06, Phase 08
 
 **Changes**:
-- `web/src/features/library/LibraryList.tsx` — list of user's libraries
-- `web/src/features/library/LibraryBrowser.tsx` — book grid for a library
-- `web/src/features/book/BookCard.tsx` — cover image + title + author
-- Book grid with lazy-loaded cover images
-- Filter controls: format, book type
-- Sort controls: title, added date, author
-- Pagination
-- Route: /libraries, /libraries/{id}/books
+- [x] `web/src/features/library/LibraryList.tsx` — list of user's libraries
+- [x] `web/src/features/library/LibraryBrowser.tsx` — book grid for a library
+- [x] `web/src/features/book/BookCard.tsx` — cover image + title + author
+- [x] Book grid with lazy-loaded cover images
+- [x] Filter controls: format, book type
+- [x] Sort controls: title, added date, author
+- [x] Pagination
+- [x] Route: /libraries, /libraries/{id}/books
 
 **Verification**:
-- Libraries page shows all accessible libraries
-- Clicking a library shows book grid with covers
-- Filters narrow results correctly
-- Sort changes order
-- Pagination works
-- Covers load lazily
+- [ ] Libraries page shows all accessible libraries
+- [ ] Clicking a library shows book grid with covers
+- [ ] Filters narrow results correctly
+- [ ] Sort changes order
+- [ ] Pagination works
+- [ ] Covers load lazily
 
 ---
 

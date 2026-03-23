@@ -16,14 +16,9 @@ import AuthProvider, { useAuth } from "./features/auth/AuthProvider";
 import LoginPage from "./features/auth/LoginPage";
 import ProtectedRoute from "./features/auth/ProtectedRoute";
 import Dashboard from "./features/dashboard/Dashboard";
+import LibraryList from "./features/library/LibraryList";
+import LibraryBrowser from "./features/library/LibraryBrowser";
 import ToastContainer from "./shared/ui/Toast";
-
-// Stub pages for routes that will be implemented in later phases.
-const LibrariesStub: Component = () => (
-  <div class="flex flex-1 items-center justify-center p-8">
-    <p class="text-slate-400">Libraries — coming soon</p>
-  </div>
-);
 
 const ShelvesStub: Component = () => (
   <div class="flex flex-1 items-center justify-center p-8">
@@ -257,7 +252,8 @@ const App: Component = () => {
       <Route path="/login" component={LoginPage} />
       <Route path="/" component={AppLayout}>
         <Route path="/" component={Dashboard} />
-        <Route path="/libraries" component={LibrariesStub} />
+        <Route path="/libraries" component={LibraryList} />
+        <Route path="/libraries/:id/books" component={LibraryBrowser} />
         <Route path="/shelves" component={ShelvesStub} />
         <Route path="/notebook" component={NotebookStub} />
         <Route path="/settings" component={SettingsStub} />
