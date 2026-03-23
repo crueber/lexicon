@@ -257,6 +257,67 @@ func (q *Queries) GetBookMetadata(ctx context.Context, bookID int64) (BookMetada
 	return i, err
 }
 
+const getBookWithMetadata = `-- name: GetBookWithMetadata :one
+SELECT b.id, b.library_id, b.folder_path, b.book_type, b.created_at, b.added_date,
+       bm.title, bm.subtitle, bm.description, bm.publisher, bm.publish_date,
+       bm.page_count, bm.language, bm.isbn_10, bm.isbn_13, bm.cover_path,
+       bm.google_books_id, bm.amazon_id, bm.goodreads_id, bm.hardcover_id
+FROM book b
+LEFT JOIN book_metadata bm ON b.id = bm.book_id
+WHERE b.id = ? LIMIT 1
+`
+
+type GetBookWithMetadataRow struct {
+	ID            int64          `json:"id"`
+	LibraryID     int64          `json:"library_id"`
+	FolderPath    sql.NullString `json:"folder_path"`
+	BookType      string         `json:"book_type"`
+	CreatedAt     string         `json:"created_at"`
+	AddedDate     sql.NullString `json:"added_date"`
+	Title         sql.NullString `json:"title"`
+	Subtitle      sql.NullString `json:"subtitle"`
+	Description   sql.NullString `json:"description"`
+	Publisher     sql.NullString `json:"publisher"`
+	PublishDate   sql.NullString `json:"publish_date"`
+	PageCount     sql.NullInt64  `json:"page_count"`
+	Language      sql.NullString `json:"language"`
+	Isbn10        sql.NullString `json:"isbn_10"`
+	Isbn13        sql.NullString `json:"isbn_13"`
+	CoverPath     sql.NullString `json:"cover_path"`
+	GoogleBooksID sql.NullString `json:"google_books_id"`
+	AmazonID      sql.NullString `json:"amazon_id"`
+	GoodreadsID   sql.NullString `json:"goodreads_id"`
+	HardcoverID   sql.NullString `json:"hardcover_id"`
+}
+
+func (q *Queries) GetBookWithMetadata(ctx context.Context, id int64) (GetBookWithMetadataRow, error) {
+	row := q.db.QueryRowContext(ctx, getBookWithMetadata, id)
+	var i GetBookWithMetadataRow
+	err := row.Scan(
+		&i.ID,
+		&i.LibraryID,
+		&i.FolderPath,
+		&i.BookType,
+		&i.CreatedAt,
+		&i.AddedDate,
+		&i.Title,
+		&i.Subtitle,
+		&i.Description,
+		&i.Publisher,
+		&i.PublishDate,
+		&i.PageCount,
+		&i.Language,
+		&i.Isbn10,
+		&i.Isbn13,
+		&i.CoverPath,
+		&i.GoogleBooksID,
+		&i.AmazonID,
+		&i.GoodreadsID,
+		&i.HardcoverID,
+	)
+	return i, err
+}
+
 const getOrCreateAuthor = `-- name: GetOrCreateAuthor :one
 INSERT INTO author (name) VALUES (?) ON CONFLICT(name) DO UPDATE SET name = name RETURNING id, name, bio, photo_path, audnexus_id
 `

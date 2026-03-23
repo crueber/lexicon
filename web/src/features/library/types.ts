@@ -24,3 +24,67 @@ export interface BooksResponse {
   page: number;
   size: number;
 }
+
+export interface BookMetadata {
+  title?: string;
+  subtitle?: string;
+  description?: string;
+  publisher?: string;
+  publishDate?: string;
+  pageCount?: number;
+  language?: string;
+  isbn10?: string;
+  isbn13?: string;
+  coverPath?: string;
+  googleBooksId?: string;
+  amazonId?: string;
+  goodreadsId?: string;
+  hardcoverId?: string;
+}
+
+export interface Author {
+  id: number;
+  name: string;
+}
+
+export interface Series {
+  id: number;
+  name: string;
+  seriesNumber?: number;
+}
+
+export interface Category {
+  id: number;
+  name: string;
+}
+
+export interface Tag {
+  id: number;
+  name: string;
+}
+
+export interface BookFile {
+  id: number;
+  format: string;
+  fileSize?: number;
+  filePath: string;
+  trackNumber?: number;
+  trackTitle?: string;
+  durationSecs?: number;
+}
+
+export interface BookDetail {
+  id: number;
+  libraryId: number;
+  bookType: "EBOOK" | "AUDIOBOOK" | "COMIC";
+  folderPath?: string;
+  addedDate?: string;
+  title?: string;
+  coverPath?: string;
+  metadata?: BookMetadata;
+  authors: Author[];
+  series: Series[];
+  categories: Category[];
+  tags: Tag[];
+  files: BookFile[];
+}

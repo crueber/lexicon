@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -32,6 +33,9 @@ func NewHandler(db *sql.DB, logger *slog.Logger) *Handler {
 // RequireAuth must already be applied by the caller.
 func (h *Handler) Routes(r chi.Router) {
 	r.Get("/", h.handleList)
+	r.Get("/{id}", h.handleGet)
+	r.Delete("/{id}", h.handleDelete)
+	r.Get("/{id}/files", h.handleListFiles)
 }
 
 // listParams holds the validated parameters for listing books.
@@ -264,6 +268,371 @@ func (h *Handler) handleList(w http.ResponseWriter, r *http.Request) {
 		Page:  page,
 		Size:  size,
 	})
+}
+
+// BookMetadataResponse is the JSON representation of book metadata.
+type BookMetadataResponse struct {
+	Title         *string `json:"title"`
+	Subtitle      *string `json:"subtitle"`
+	Description   *string `json:"description"`
+	Publisher     *string `json:"publisher"`
+	PublishDate   *string `json:"publishDate"`
+	PageCount     *int64  `json:"pageCount"`
+	Language      *string `json:"language"`
+	Isbn10        *string `json:"isbn10"`
+	Isbn13        *string `json:"isbn13"`
+	CoverPath     *string `json:"coverPath"`
+	GoogleBooksID *string `json:"googleBooksId"`
+	AmazonID      *string `json:"amazonId"`
+	GoodreadsID   *string `json:"goodreadsId"`
+	HardcoverID   *string `json:"hardcoverId"`
+}
+
+// AuthorResponse is the JSON representation of an author.
+type AuthorResponse struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+// SeriesResponse is the JSON representation of a series entry.
+type SeriesResponse struct {
+	ID           int64    `json:"id"`
+	Name         string   `json:"name"`
+	SeriesNumber *float64 `json:"seriesNumber"`
+}
+
+// CategoryResponse is the JSON representation of a category.
+type CategoryResponse struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+// TagResponse is the JSON representation of a tag.
+type TagResponse struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+// BookFileResponse is the JSON representation of a book file.
+type BookFileResponse struct {
+	ID           int64   `json:"id"`
+	Format       string  `json:"format"`
+	FileSize     *int64  `json:"fileSize"`
+	FilePath     string  `json:"filePath"`
+	TrackNumber  *int64  `json:"trackNumber"`
+	TrackTitle   *string `json:"trackTitle"`
+	DurationSecs *int64  `json:"durationSecs"`
+}
+
+// BookDetailResponse is the JSON representation of a book with full details.
+type BookDetailResponse struct {
+	ID         int64                 `json:"id"`
+	LibraryID  int64                 `json:"libraryId"`
+	BookType   string                `json:"bookType"`
+	FolderPath *string               `json:"folderPath"`
+	AddedDate  *string               `json:"addedDate"`
+	Metadata   *BookMetadataResponse `json:"metadata"`
+	Authors    []AuthorResponse      `json:"authors"`
+	Series     []SeriesResponse      `json:"series"`
+	Categories []CategoryResponse    `json:"categories"`
+	Tags       []TagResponse         `json:"tags"`
+	Files      []BookFileResponse    `json:"files"`
+}
+
+// handleGet handles GET /api/books/{id}.
+func (h *Handler) handleGet(w http.ResponseWriter, r *http.Request) {
+	principal := auth.PrincipalFromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid book id")
+		return
+	}
+
+	q := New(h.db)
+	ctx := r.Context()
+
+	// Fetch book with metadata in a single query.
+	row, err := q.GetBookWithMetadata(ctx, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "book not found")
+			return
+		}
+		h.logger.Error("get book with metadata", "book_id", id, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	// Fetch authors.
+	authors, err := q.ListBookAuthors(ctx, id)
+	if err != nil {
+		h.logger.Warn("list book authors", "book_id", id, "error", err)
+		authors = nil
+	}
+
+	// Fetch series.
+	seriesRows, err := q.ListBookSeries(ctx, id)
+	if err != nil {
+		h.logger.Warn("list book series", "book_id", id, "error", err)
+		seriesRows = nil
+	}
+
+	// Fetch categories.
+	categories, err := q.ListBookCategories(ctx, id)
+	if err != nil {
+		h.logger.Warn("list book categories", "book_id", id, "error", err)
+		categories = nil
+	}
+
+	// Fetch tags.
+	tags, err := q.ListBookTags(ctx, id)
+	if err != nil {
+		h.logger.Warn("list book tags", "book_id", id, "error", err)
+		tags = nil
+	}
+
+	// Fetch files.
+	files, err := q.ListBookFiles(ctx, id)
+	if err != nil {
+		h.logger.Warn("list book files", "book_id", id, "error", err)
+		files = nil
+	}
+
+	// Assemble response.
+	resp := BookDetailResponse{
+		ID:         row.ID,
+		LibraryID:  row.LibraryID,
+		BookType:   row.BookType,
+		Authors:    make([]AuthorResponse, 0, len(authors)),
+		Series:     make([]SeriesResponse, 0, len(seriesRows)),
+		Categories: make([]CategoryResponse, 0, len(categories)),
+		Tags:       make([]TagResponse, 0, len(tags)),
+		Files:      make([]BookFileResponse, 0, len(files)),
+	}
+
+	if row.FolderPath.Valid {
+		resp.FolderPath = &row.FolderPath.String
+	}
+	if row.AddedDate.Valid {
+		resp.AddedDate = &row.AddedDate.String
+	}
+
+	// Build metadata if any metadata field is present.
+	meta := &BookMetadataResponse{}
+	hasMetadata := false
+	if row.Title.Valid {
+		meta.Title = &row.Title.String
+		hasMetadata = true
+	}
+	if row.Subtitle.Valid {
+		meta.Subtitle = &row.Subtitle.String
+		hasMetadata = true
+	}
+	if row.Description.Valid {
+		meta.Description = &row.Description.String
+		hasMetadata = true
+	}
+	if row.Publisher.Valid {
+		meta.Publisher = &row.Publisher.String
+		hasMetadata = true
+	}
+	if row.PublishDate.Valid {
+		meta.PublishDate = &row.PublishDate.String
+		hasMetadata = true
+	}
+	if row.PageCount.Valid {
+		meta.PageCount = &row.PageCount.Int64
+		hasMetadata = true
+	}
+	if row.Language.Valid {
+		meta.Language = &row.Language.String
+		hasMetadata = true
+	}
+	if row.Isbn10.Valid {
+		meta.Isbn10 = &row.Isbn10.String
+		hasMetadata = true
+	}
+	if row.Isbn13.Valid {
+		meta.Isbn13 = &row.Isbn13.String
+		hasMetadata = true
+	}
+	if row.CoverPath.Valid {
+		meta.CoverPath = &row.CoverPath.String
+		hasMetadata = true
+	}
+	if row.GoogleBooksID.Valid {
+		meta.GoogleBooksID = &row.GoogleBooksID.String
+		hasMetadata = true
+	}
+	if row.AmazonID.Valid {
+		meta.AmazonID = &row.AmazonID.String
+		hasMetadata = true
+	}
+	if row.GoodreadsID.Valid {
+		meta.GoodreadsID = &row.GoodreadsID.String
+		hasMetadata = true
+	}
+	if row.HardcoverID.Valid {
+		meta.HardcoverID = &row.HardcoverID.String
+		hasMetadata = true
+	}
+	if hasMetadata {
+		resp.Metadata = meta
+	}
+
+	for _, a := range authors {
+		resp.Authors = append(resp.Authors, AuthorResponse{ID: a.ID, Name: a.Name})
+	}
+
+	for _, s := range seriesRows {
+		sr := SeriesResponse{ID: s.ID, Name: s.Name}
+		if s.SeriesNumber.Valid {
+			sr.SeriesNumber = &s.SeriesNumber.Float64
+		}
+		resp.Series = append(resp.Series, sr)
+	}
+
+	for _, c := range categories {
+		resp.Categories = append(resp.Categories, CategoryResponse{ID: c.ID, Name: c.Name})
+	}
+
+	for _, t := range tags {
+		resp.Tags = append(resp.Tags, TagResponse{ID: t.ID, Name: t.Name})
+	}
+
+	for _, f := range files {
+		fr := BookFileResponse{
+			ID:       f.ID,
+			Format:   f.Format,
+			FilePath: f.FilePath,
+		}
+		if f.FileSize.Valid {
+			fr.FileSize = &f.FileSize.Int64
+		}
+		if f.TrackNumber.Valid {
+			fr.TrackNumber = &f.TrackNumber.Int64
+		}
+		if f.TrackTitle.Valid {
+			fr.TrackTitle = &f.TrackTitle.String
+		}
+		if f.DurationSecs.Valid {
+			fr.DurationSecs = &f.DurationSecs.Int64
+		}
+		resp.Files = append(resp.Files, fr)
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleDelete handles DELETE /api/books/{id} (admin only).
+func (h *Handler) handleDelete(w http.ResponseWriter, r *http.Request) {
+	principal := auth.PrincipalFromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	if !principal.IsAdmin() {
+		writeError(w, http.StatusForbidden, "admin access required")
+		return
+	}
+
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid book id")
+		return
+	}
+
+	q := New(h.db)
+	ctx := r.Context()
+
+	// Verify the book exists before deleting.
+	_, err = q.GetBookByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "book not found")
+			return
+		}
+		h.logger.Error("get book for delete", "book_id", id, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	if err := q.DeleteBook(ctx, id); err != nil {
+		h.logger.Error("delete book", "book_id", id, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleListFiles handles GET /api/books/{id}/files.
+func (h *Handler) handleListFiles(w http.ResponseWriter, r *http.Request) {
+	principal := auth.PrincipalFromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid book id")
+		return
+	}
+
+	q := New(h.db)
+	ctx := r.Context()
+
+	// Verify the book exists.
+	_, err = q.GetBookByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "book not found")
+			return
+		}
+		h.logger.Error("get book for files", "book_id", id, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	files, err := q.ListBookFiles(ctx, id)
+	if err != nil {
+		h.logger.Error("list book files", "book_id", id, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	resp := make([]BookFileResponse, 0, len(files))
+	for _, f := range files {
+		fr := BookFileResponse{
+			ID:       f.ID,
+			Format:   f.Format,
+			FilePath: f.FilePath,
+		}
+		if f.FileSize.Valid {
+			fr.FileSize = &f.FileSize.Int64
+		}
+		if f.TrackNumber.Valid {
+			fr.TrackNumber = &f.TrackNumber.Int64
+		}
+		if f.TrackTitle.Valid {
+			fr.TrackTitle = &f.TrackTitle.String
+		}
+		if f.DurationSecs.Valid {
+			fr.DurationSecs = &f.DurationSecs.Int64
+		}
+		resp = append(resp, fr)
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // writeJSON writes a JSON response with the given status code.

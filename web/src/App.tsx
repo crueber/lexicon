@@ -18,6 +18,7 @@ import ProtectedRoute from "./features/auth/ProtectedRoute";
 import Dashboard from "./features/dashboard/Dashboard";
 import LibraryList from "./features/library/LibraryList";
 import LibraryBrowser from "./features/library/LibraryBrowser";
+import BookDetail from "./features/book/BookDetail";
 import ToastContainer from "./shared/ui/Toast";
 
 const ShelvesStub: Component = () => (
@@ -254,6 +255,7 @@ const App: Component = () => {
         <Route path="/" component={Dashboard} />
         <Route path="/libraries" component={LibraryList} />
         <Route path="/libraries/:id/books" component={LibraryBrowser} />
+        <Route path="/books/:id" component={BookDetail} />
         <Route path="/shelves" component={ShelvesStub} />
         <Route path="/notebook" component={NotebookStub} />
         <Route path="/settings" component={SettingsStub} />
