@@ -22,6 +22,7 @@ import LibraryBrowser from "./features/library/LibraryBrowser";
 import BookDetail from "./features/book/BookDetail";
 import EpubReader from "./features/reader/EpubReader";
 import PdfReader from "./features/reader/PdfReader";
+import ComicReader from "./features/reader/ComicReader";
 import ReaderDispatch from "./features/reader/ReaderDispatch";
 import ShelfList from "./features/shelf/ShelfList";
 import ShelfDetail from "./features/shelf/ShelfDetail";
@@ -262,6 +263,7 @@ const App: Component = () => {
       <Route path="/books/:id/read" component={ReaderDispatch} />
       <Route path="/books/:id/read/epub" component={EpubReader} />
       <Route path="/books/:id/read/pdf" component={PdfReader} />
+      <Route path="/books/:id/read/comic" component={ComicReader} />
       <Route path="/" component={AppLayout}>
         <Route path="/" component={Dashboard} />
         <Route path="/libraries" component={LibraryList} />

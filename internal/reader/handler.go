@@ -41,6 +41,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // RequireAuth must already be applied by the caller.
 func (h *Handler) Routes(r chi.Router) {
 	r.Get("/books/{bookId}/files/{fileId}/stream", h.handleStream)
+	r.Get("/books/{bookId}/files/{fileId}/pages", h.handleListComicPages)
+	r.Get("/books/{bookId}/files/{fileId}/pages/{pageIndex}", h.handleGetComicPage)
 	r.Get("/books/{bookId}/progress", h.handleGetProgress)
 	r.Put("/books/{bookId}/progress", h.handlePutProgress)
 	r.Get("/books/{bookId}/settings", h.handleGetSettings)
@@ -368,6 +370,122 @@ func (h *Handler) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleListComicPages handles GET /api/reader/books/{bookId}/files/{fileId}/pages.
+// Returns the ordered list of image pages in the comic archive.
+func (h *Handler) handleListComicPages(w http.ResponseWriter, r *http.Request) {
+	principal := auth.PrincipalFromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	bookID, err := strconv.ParseInt(chi.URLParam(r, "bookId"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid book id")
+		return
+	}
+
+	fileID, err := strconv.ParseInt(chi.URLParam(r, "fileId"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid file id")
+		return
+	}
+
+	q := New(h.db)
+	ctx := r.Context()
+
+	bookFile, err := q.GetBookFileForReader(ctx, GetBookFileForReaderParams{
+		ID:     fileID,
+		BookID: bookID,
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "file not found")
+			return
+		}
+		h.logger.Error("get book file for comic pages", "file_id", fileID, "book_id", bookID, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	if !hasLibraryAccess(principal, bookFile.LibraryID) {
+		writeError(w, http.StatusForbidden, "access denied")
+		return
+	}
+
+	pages, err := ListComicPages(bookFile.FilePath, bookFile.Format)
+	if err != nil {
+		h.logger.Error("list comic pages", "file_id", fileID, "format", bookFile.Format, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, pages)
+}
+
+// handleGetComicPage handles GET /api/reader/books/{bookId}/files/{fileId}/pages/{pageIndex}.
+// Returns the image bytes for a specific page.
+func (h *Handler) handleGetComicPage(w http.ResponseWriter, r *http.Request) {
+	principal := auth.PrincipalFromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	bookID, err := strconv.ParseInt(chi.URLParam(r, "bookId"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid book id")
+		return
+	}
+
+	fileID, err := strconv.ParseInt(chi.URLParam(r, "fileId"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid file id")
+		return
+	}
+
+	pageIndex, err := strconv.Atoi(chi.URLParam(r, "pageIndex"))
+	if err != nil || pageIndex < 0 {
+		writeError(w, http.StatusBadRequest, "invalid page index")
+		return
+	}
+
+	q := New(h.db)
+	ctx := r.Context()
+
+	bookFile, err := q.GetBookFileForReader(ctx, GetBookFileForReaderParams{
+		ID:     fileID,
+		BookID: bookID,
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "file not found")
+			return
+		}
+		h.logger.Error("get book file for comic page", "file_id", fileID, "book_id", bookID, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	if !hasLibraryAccess(principal, bookFile.LibraryID) {
+		writeError(w, http.StatusForbidden, "access denied")
+		return
+	}
+
+	data, mimeType, err := GetComicPage(bookFile.FilePath, bookFile.Format, pageIndex)
+	if err != nil {
+		h.logger.Error("get comic page", "file_id", fileID, "page", pageIndex, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	w.Header().Set("Content-Type", mimeType)
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
 }
 
 // writeJSON writes a JSON response with the given status code.

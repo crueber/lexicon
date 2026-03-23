@@ -2484,17 +2484,22 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 11
 
 **Changes**:
-- Page extraction from CBZ (zip), CBR (rar via `mholt/archives`), CB7 (7z via `mholt/archives`)
-- `internal/reader/handler.go` — GET /api/files/{id}/comic/pages, GET /api/files/{id}/comic/page/{n}
-- Page cache: extract all pages on first open, cache in `/app/data/cache/comics/{fileId}/`
-- `web/src/features/reader/ComicReader.tsx` — custom canvas renderer
-- Reading direction (LTR/RTL), display mode (single/double/strip)
-- Page turn via click zones or keyboard
-- Pre-fetch next 3 pages
-- Progress save (page number)
-- Route: /books/{id}/read/comic
+- [x] Page extraction from CBZ (zip), CBR (rar via `mholt/archives`), CB7 (7z via `mholt/archives`)
+- [x] `internal/reader/handler.go` — GET /api/reader/books/{bookId}/files/{fileId}/pages, GET /api/reader/books/{bookId}/files/{fileId}/pages/{pageIndex}
+- [x] `internal/reader/comic.go` — ListComicPages and GetComicPage functions
+- [x] `web/src/features/reader/ComicReader.tsx` — full-screen comic reader with img-based rendering
+- [x] Reading direction (LTR/RTL), display mode (single/double), fit mode (width/height/original)
+- [x] Page turn via click zones or keyboard (arrow keys)
+- [x] Pre-fetch next 2 pages in background
+- [x] Progress save (page number, debounced 2s)
+- [x] Route: /books/{id}/read/comic
+- [x] ReaderDispatch updated to route CBZ/CBR/CB7 to comic reader
 
 **Verification**:
+- [x] `go build -tags dev ./...` passes
+- [x] `go vet -tags dev ./...` passes
+- [x] `go test -tags dev -race ./...` passes (all tests green)
+- [x] `npm run build` passes (TypeScript compiles, Vite builds)
 - Open a CBZ comic in the reader
 - Navigate pages via click/keyboard
 - Double-page spread mode works

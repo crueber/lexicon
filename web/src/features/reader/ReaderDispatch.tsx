@@ -10,12 +10,18 @@ async function fetchBookFiles(bookId: string): Promise<BookFile[]> {
 }
 
 // Determine the best file to read from the list.
-// Preference order: EPUB > PDF > anything else.
+// Preference order: EPUB > PDF > CBZ > CBR > CB7 > anything else.
 function pickBestFile(files: BookFile[]): BookFile | undefined {
   const epub = files.find((f) => f.format === "EPUB");
   if (epub) return epub;
   const pdf = files.find((f) => f.format === "PDF");
   if (pdf) return pdf;
+  const cbz = files.find((f) => f.format === "CBZ");
+  if (cbz) return cbz;
+  const cbr = files.find((f) => f.format === "CBR");
+  if (cbr) return cbr;
+  const cb7 = files.find((f) => f.format === "CB7");
+  if (cb7) return cb7;
   return files[0];
 }
 
@@ -24,6 +30,10 @@ function readerRouteForFormat(format: string): string {
   switch (format) {
     case "PDF":
       return "pdf";
+    case "CBZ":
+    case "CBR":
+    case "CB7":
+      return "comic";
     default:
       return "epub";
   }
