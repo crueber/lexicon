@@ -2353,13 +2353,13 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Parallelizable with**: Phase 10-16
 
 **Changes**:
-- `internal/user/handler.go` — admin CRUD endpoints for users
-- Permission management: role, per-feature flags (canDownload, canUpload, etc.)
-- User-library access control management
-- `web/src/features/admin/UserManagement.tsx` — user list, create, edit, permissions
-- User settings page: theme, reader preferences
-- `web/src/features/auth/SettingsPage.tsx` — user self-service settings
-- Routes: /admin/users, /settings
+- [x] `internal/user/handler.go` — admin CRUD endpoints for users
+- [x] Permission management: role, per-feature flags (canDownload, canUpload, etc.)
+- [x] User-library access control management
+- [x] `web/src/features/admin/UserManagement.tsx` — user list, create, edit, permissions
+- [x] User settings page: theme, reader preferences
+- [x] `web/src/features/auth/SettingsPage.tsx` — user self-service settings
+- [x] Routes: /admin/users, /settings
 
 **Verification**:
 - Admin can create new users

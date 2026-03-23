@@ -64,6 +64,19 @@ func (s *Server) setupRoutes() {
 			s.taskHandler.Routes(r)
 		})
 
+		// Admin user management routes (require auth + admin).
+		r.Route("/admin/users", func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			r.Use(auth.RequireAdmin())
+			s.userHandler.AdminRoutes(r)
+		})
+
+		// Self-service user routes (require auth).
+		r.Route("/users", func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			s.userHandler.SelfRoutes(r)
+		})
+
 		// Reader routes (require auth).
 		r.Route("/reader", func(r chi.Router) {
 			r.Use(auth.RequireAuth(s.cfg.JWTSecret))

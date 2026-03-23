@@ -15,6 +15,7 @@ import {
 import AuthProvider, { useAuth } from "./features/auth/AuthProvider";
 import LoginPage from "./features/auth/LoginPage";
 import ProtectedRoute from "./features/auth/ProtectedRoute";
+import SettingsPage from "./features/auth/SettingsPage";
 import Dashboard from "./features/dashboard/Dashboard";
 import LibraryList from "./features/library/LibraryList";
 import LibraryBrowser from "./features/library/LibraryBrowser";
@@ -24,6 +25,7 @@ import PdfReader from "./features/reader/PdfReader";
 import ReaderDispatch from "./features/reader/ReaderDispatch";
 import ShelfList from "./features/shelf/ShelfList";
 import ShelfDetail from "./features/shelf/ShelfDetail";
+import UserManagement from "./features/admin/UserManagement";
 import ToastContainer from "./shared/ui/Toast";
 import WSProvider from "./shared/ws/WSProvider";
 
@@ -33,17 +35,7 @@ const NotebookStub: Component = () => (
   </div>
 );
 
-const SettingsStub: Component = () => (
-  <div class="flex flex-1 items-center justify-center p-8">
-    <p class="text-slate-400">Settings — coming soon</p>
-  </div>
-);
 
-const AdminUsersStub: Component = () => (
-  <div class="flex flex-1 items-center justify-center p-8">
-    <p class="text-slate-400">User Management — coming soon</p>
-  </div>
-);
 
 const AdminSettingsStub: Component = () => (
   <div class="flex flex-1 items-center justify-center p-8">
@@ -276,8 +268,8 @@ const App: Component = () => {
         <Route path="/shelves" component={ShelfList} />
         <Route path="/shelves/:id" component={ShelfDetail} />
         <Route path="/notebook" component={NotebookStub} />
-        <Route path="/settings" component={SettingsStub} />
-        <Route path="/admin/users" component={AdminUsersStub} />
+        <Route path="/settings" component={SettingsPage} />
+        <Route path="/admin/users" component={UserManagement} />
         <Route path="/admin/settings" component={AdminSettingsStub} />
       </Route>
     </Router>

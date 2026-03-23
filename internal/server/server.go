@@ -32,6 +32,7 @@ type Server struct {
 	router         *chi.Mux
 	logger         *slog.Logger
 	authHandler    *auth.Handler
+	userHandler    *user.Handler
 	libraryHandler *library.Handler
 	bookHandler    *book.Handler
 	storageHandler *storage.Handler
@@ -90,12 +91,51 @@ func New(cfg Config) (*Server, error) {
 	bookHdlr := book.NewHandler(db, logger)
 	bookHdlr.WithShelfHandler(shelfHdlr)
 
+	// Build the user handler with injected dependencies to avoid import cycles.
+	// The user package cannot import auth (auth imports user), so we inject
+	// the principal extractor and library access setter as functions.
+	userHdlr := user.NewHandler(db, logger,
+		func(ctx context.Context) *user.Principal {
+			p := auth.PrincipalFromContext(ctx)
+			if p == nil {
+				return nil
+			}
+			return &user.Principal{
+				UserID:   p.UserID,
+				Username: p.Username,
+				Role:     p.Role,
+			}
+		},
+		func(ctx context.Context, db *sql.DB, userID int64, libraryIDs []int64) error {
+			tx, err := db.BeginTx(ctx, nil)
+			if err != nil {
+				return fmt.Errorf("begin transaction: %w", err)
+			}
+			defer tx.Rollback()
+
+			lq := library.New(tx)
+			if err := lq.ClearUserLibraryPermissions(ctx, userID); err != nil {
+				return fmt.Errorf("clear library permissions: %w", err)
+			}
+			for _, libID := range libraryIDs {
+				if err := lq.GrantLibraryAccess(ctx, library.GrantLibraryAccessParams{
+					UserID:    userID,
+					LibraryID: libID,
+				}); err != nil {
+					return fmt.Errorf("grant library access %d: %w", libID, err)
+				}
+			}
+			return tx.Commit()
+		},
+	)
+
 	s := &Server{
 		cfg:            cfg,
 		db:             db,
 		router:         chi.NewRouter(),
 		logger:         logger,
 		authHandler:    auth.NewHandler(db, cfg.JWTSecret, logger),
+		userHandler:    userHdlr,
 		libraryHandler: libraryHandler,
 		bookHandler:    bookHdlr,
 		storageHandler: storage.NewHandler(db, cfg.DataDir, logger),
