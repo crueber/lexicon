@@ -10,6 +10,17 @@ import (
 	"database/sql"
 )
 
+const getAudiobookReaderSetting = `-- name: GetAudiobookReaderSetting :one
+SELECT audiobook_reader_setting FROM user_settings WHERE user_id = ?
+`
+
+func (q *Queries) GetAudiobookReaderSetting(ctx context.Context, userID int64) (sql.NullString, error) {
+	row := q.db.QueryRowContext(ctx, getAudiobookReaderSetting, userID)
+	var audiobook_reader_setting sql.NullString
+	err := row.Scan(&audiobook_reader_setting)
+	return audiobook_reader_setting, err
+}
+
 const getBookFileForReader = `-- name: GetBookFileForReader :one
 SELECT bf.id, bf.book_id, bf.file_path, bf.format, b.library_id
 FROM book_file bf
@@ -86,6 +97,22 @@ func (q *Queries) GetReadingProgress(ctx context.Context, arg GetReadingProgress
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const upsertAudiobookReaderSetting = `-- name: UpsertAudiobookReaderSetting :exec
+INSERT INTO user_settings (user_id, audiobook_reader_setting)
+VALUES (?, ?)
+ON CONFLICT(user_id) DO UPDATE SET audiobook_reader_setting = excluded.audiobook_reader_setting
+`
+
+type UpsertAudiobookReaderSettingParams struct {
+	UserID                 int64          `json:"user_id"`
+	AudiobookReaderSetting sql.NullString `json:"audiobook_reader_setting"`
+}
+
+func (q *Queries) UpsertAudiobookReaderSetting(ctx context.Context, arg UpsertAudiobookReaderSettingParams) error {
+	_, err := q.db.ExecContext(ctx, upsertAudiobookReaderSetting, arg.UserID, arg.AudiobookReaderSetting)
+	return err
 }
 
 const upsertEpubReaderSetting = `-- name: UpsertEpubReaderSetting :exec

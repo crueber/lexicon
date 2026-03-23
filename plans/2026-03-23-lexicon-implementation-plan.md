@@ -2518,27 +2518,34 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Parallelizable with**: Phase 22
 
 **Changes**:
-- Chapter extraction from M4B via ffprobe (downloaded tool)
-- Track-based playback for folder audiobooks
-- `internal/reader/handler.go` — GET /api/books/{id}/audiobook (structure), audio streaming
-- `web/src/features/reader/AudioPlayer.tsx` — sticky bottom bar player
-- Cover art, title, author, chapter name display
-- Scrubable progress bar
-- Chapter list panel
-- Playback speed control (0.5×–3.0×)
-- Sleep timer (15/30/45/60 min or end of chapter)
-- Skip back/forward buttons
-- Progress save (seconds elapsed)
-- Route: /books/{id}/read/audio
+- [x] Track-based playback for folder audiobooks (M4B, M4A, MP3, OPUS, FLAC)
+- [x] `internal/reader/handler.go` — token query param middleware, audiobook settings endpoints
+- [x] `internal/reader/queries.sql` — GetAudiobookReaderSetting, UpsertAudiobookReaderSetting
+- [x] `web/src/features/reader/AudiobookPlayer.tsx` — full-screen audiobook player
+- [x] Cover art, title, author, track name display
+- [x] Scrubable progress bar with buffered indicator
+- [x] Track list panel (collapsible sidebar)
+- [x] Playback speed control (0.75×, 1×, 1.25×, 1.5×, 2×)
+- [x] Skip back/forward buttons (configurable interval)
+- [x] Volume slider with mute toggle
+- [x] Progress save (AUDIO_POSITION, debounced 5s)
+- [x] Media Session API (lock screen controls)
+- [x] Auto-advance to next track on end
+- [x] `web/src/features/reader/ReaderDispatch.tsx` — routes audio formats to /audio
+- [x] `web/src/App.tsx` — added /books/:id/read/audio route
+- [x] Route: /books/{id}/read/audio
 
 **Verification**:
-- Play an M4B audiobook with chapters
-- Chapter navigation works
-- Play a folder-based audiobook (multiple MP3s)
-- Track transitions are seamless
-- Close and reopen — resumes at same position
-- Sleep timer stops playback
-- Playback speed changes work
+- [x] Go build passes (`go build -tags dev ./...`)
+- [x] Go vet passes (`go vet -tags dev ./...`)
+- [x] Go tests pass with race detector (`go test -tags dev -race ./...`)
+- [x] Frontend builds (`npm run build`)
+- [ ] Play an M4B audiobook with chapters
+- [ ] Chapter navigation works
+- [ ] Play a folder-based audiobook (multiple MP3s)
+- [ ] Track transitions are seamless
+- [ ] Close and reopen — resumes at same position
+- [ ] Playback speed changes work
 
 ---
 

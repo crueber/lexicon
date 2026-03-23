@@ -9,8 +9,10 @@ async function fetchBookFiles(bookId: string): Promise<BookFile[]> {
   return api<BookFile[]>(`/books/${bookId}/files`);
 }
 
+const AUDIO_FORMATS = new Set(["M4B", "M4A", "MP3", "OPUS", "FLAC"]);
+
 // Determine the best file to read from the list.
-// Preference order: EPUB > PDF > CBZ > CBR > CB7 > anything else.
+// Preference order: EPUB > PDF > CBZ > CBR > CB7 > audio > anything else.
 function pickBestFile(files: BookFile[]): BookFile | undefined {
   const epub = files.find((f) => f.format === "EPUB");
   if (epub) return epub;
@@ -22,18 +24,33 @@ function pickBestFile(files: BookFile[]): BookFile | undefined {
   if (cbr) return cbr;
   const cb7 = files.find((f) => f.format === "CB7");
   if (cb7) return cb7;
+  // Audio formats: pick the first track (lowest track number or first by path).
+  const audio = files
+    .filter((f) => AUDIO_FORMATS.has(f.format.toUpperCase()))
+    .sort((a, b) => {
+      const tn = (a.trackNumber ?? 9999) - (b.trackNumber ?? 9999);
+      if (tn !== 0) return tn;
+      return a.filePath.localeCompare(b.filePath);
+    })[0];
+  if (audio) return audio;
   return files[0];
 }
 
 // Map a file format to the reader route segment.
 function readerRouteForFormat(format: string): string {
-  switch (format) {
+  switch (format.toUpperCase()) {
     case "PDF":
       return "pdf";
     case "CBZ":
     case "CBR":
     case "CB7":
       return "comic";
+    case "M4B":
+    case "M4A":
+    case "MP3":
+    case "OPUS":
+    case "FLAC":
+      return "audio";
     default:
       return "epub";
   }

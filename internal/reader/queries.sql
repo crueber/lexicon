@@ -34,3 +34,11 @@ ON CONFLICT(user_id) DO UPDATE SET epub_reader_setting = excluded.epub_reader_se
 INSERT INTO user_settings (user_id, pdf_reader_setting)
 VALUES (?, ?)
 ON CONFLICT(user_id) DO UPDATE SET pdf_reader_setting = excluded.pdf_reader_setting;
+
+-- name: GetAudiobookReaderSetting :one
+SELECT audiobook_reader_setting FROM user_settings WHERE user_id = ?;
+
+-- name: UpsertAudiobookReaderSetting :exec
+INSERT INTO user_settings (user_id, audiobook_reader_setting)
+VALUES (?, ?)
+ON CONFLICT(user_id) DO UPDATE SET audiobook_reader_setting = excluded.audiobook_reader_setting;

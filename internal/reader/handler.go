@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -37,9 +38,33 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
+// TokenQueryParamMiddleware extracts a JWT from the ?token= query parameter
+// and injects it as a Bearer token in the Authorization header. This allows
+// HTML5 <audio> and <video> elements (which cannot set custom headers) to
+// authenticate with the streaming endpoint.
+//
+// If an Authorization header is already present, it is left unchanged.
+func TokenQueryParamMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") == "" {
+			if token := r.URL.Query().Get("token"); token != "" {
+				// Clone the request so we can modify the header safely.
+				r2 := r.Clone(r.Context())
+				r2.Header.Set("Authorization", "Bearer "+strings.TrimSpace(token))
+				next.ServeHTTP(w, r2)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // Routes registers all reader routes on the given router.
 // RequireAuth must already be applied by the caller.
 func (h *Handler) Routes(r chi.Router) {
+	// Apply token query param middleware so <audio src="...?token=..."> works.
+	r.Use(TokenQueryParamMiddleware)
+
 	r.Get("/books/{bookId}/files/{fileId}/stream", h.handleStream)
 	r.Get("/books/{bookId}/files/{fileId}/pages", h.handleListComicPages)
 	r.Get("/books/{bookId}/files/{fileId}/pages/{pageIndex}", h.handleGetComicPage)
@@ -47,6 +72,8 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Put("/books/{bookId}/progress", h.handlePutProgress)
 	r.Get("/books/{bookId}/settings", h.handleGetSettings)
 	r.Put("/books/{bookId}/settings", h.handlePutSettings)
+	r.Get("/books/{bookId}/audiobook-settings", h.handleGetAudiobookSettings)
+	r.Put("/books/{bookId}/audiobook-settings", h.handlePutAudiobookSettings)
 }
 
 // contentTypeForFormat returns the appropriate MIME type for a book file format.
@@ -66,6 +93,10 @@ func contentTypeForFormat(format string) string {
 		return "audio/mpeg"
 	case "M4B":
 		return "audio/mp4"
+	case "M4A":
+		return "audio/mp4"
+	case "OPUS":
+		return "audio/ogg; codecs=opus"
 	case "FLAC":
 		return "audio/flac"
 	default:
@@ -486,6 +517,92 @@ func (h *Handler) handleGetComicPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(data)
+}
+
+// handleGetAudiobookSettings handles GET /api/reader/books/{bookId}/audiobook-settings.
+// Returns the audiobook reader settings for the authenticated user.
+func (h *Handler) handleGetAudiobookSettings(w http.ResponseWriter, r *http.Request) {
+	principal := auth.PrincipalFromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	_, err := strconv.ParseInt(chi.URLParam(r, "bookId"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid book id")
+		return
+	}
+
+	q := New(h.db)
+	ctx := r.Context()
+
+	setting, err := q.GetAudiobookReaderSetting(ctx, principal.UserID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeJSON(w, http.StatusOK, map[string]any{})
+			return
+		}
+		h.logger.Error("get audiobook reader setting", "user_id", principal.UserID, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	if !setting.Valid || setting.String == "" {
+		writeJSON(w, http.StatusOK, map[string]any{})
+		return
+	}
+
+	var parsed any
+	if err := json.Unmarshal([]byte(setting.String), &parsed); err != nil {
+		h.logger.Warn("audiobook reader setting is not valid JSON", "user_id", principal.UserID)
+		writeJSON(w, http.StatusOK, map[string]any{})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, parsed)
+}
+
+// handlePutAudiobookSettings handles PUT /api/reader/books/{bookId}/audiobook-settings.
+// Saves the audiobook reader settings for the authenticated user.
+func (h *Handler) handlePutAudiobookSettings(w http.ResponseWriter, r *http.Request) {
+	principal := auth.PrincipalFromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	_, err := strconv.ParseInt(chi.URLParam(r, "bookId"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid book id")
+		return
+	}
+
+	body, err := io.ReadAll(io.LimitReader(r.Body, 64*1024))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "failed to read request body")
+		return
+	}
+
+	var parsed any
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		writeError(w, http.StatusBadRequest, "request body must be valid JSON")
+		return
+	}
+
+	q := New(h.db)
+	ctx := r.Context()
+
+	if err := q.UpsertAudiobookReaderSetting(ctx, UpsertAudiobookReaderSettingParams{
+		UserID:                 principal.UserID,
+		AudiobookReaderSetting: sql.NullString{String: string(body), Valid: true},
+	}); err != nil {
+		h.logger.Error("upsert audiobook reader setting", "user_id", principal.UserID, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // writeJSON writes a JSON response with the given status code.
