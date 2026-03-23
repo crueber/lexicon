@@ -73,3 +73,12 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value;
 
 -- name: ListUserLibraryIDs :many
 SELECT library_id FROM user_library_permission WHERE user_id = ?;
+
+-- name: GetUserSettingsFull :one
+SELECT * FROM user_settings WHERE user_id = ?;
+
+-- name: UpdateEpubReaderSetting :exec
+UPDATE user_settings SET epub_reader_setting = ? WHERE user_id = ?;
+
+-- name: UpdatePdfReaderSetting :exec
+UPDATE user_settings SET pdf_reader_setting = ? WHERE user_id = ?;

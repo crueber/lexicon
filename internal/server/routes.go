@@ -57,6 +57,12 @@ func (s *Server) setupRoutes() {
 			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
 			s.taskHandler.Routes(r)
 		})
+
+		// Reader routes (require auth).
+		r.Route("/reader", func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			s.readerHandler.Routes(r)
+		})
 	})
 
 	// Frontend: proxy to Vite in dev mode, serve embedded files in production.

@@ -17,6 +17,7 @@ import (
 	"github.com/crueber/lexicon/internal/auth"
 	"github.com/crueber/lexicon/internal/book"
 	"github.com/crueber/lexicon/internal/library"
+	"github.com/crueber/lexicon/internal/reader"
 	"github.com/crueber/lexicon/internal/storage"
 	"github.com/crueber/lexicon/internal/task"
 	"github.com/crueber/lexicon/internal/user"
@@ -33,6 +34,7 @@ type Server struct {
 	libraryHandler *library.Handler
 	bookHandler    *book.Handler
 	storageHandler *storage.Handler
+	readerHandler  *reader.Handler
 	hub            *ws.Hub
 	wsHandler      *ws.Handler
 	watcher        *library.Watcher
@@ -89,6 +91,7 @@ func New(cfg Config) (*Server, error) {
 		libraryHandler: libraryHandler,
 		bookHandler:    book.NewHandler(db, logger),
 		storageHandler: storage.NewHandler(db, cfg.DataDir, logger),
+		readerHandler:  reader.NewHandler(db, logger),
 		hub:            hub,
 		wsHandler:      wsHandler,
 		watcher:        watcher,

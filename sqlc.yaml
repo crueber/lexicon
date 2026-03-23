@@ -36,3 +36,12 @@ sql:
         out: "internal/task"
         emit_json_tags: true
         emit_empty_slices: true
+  - engine: "sqlite"
+    queries: "internal/reader/queries.sql"
+    schema: "migrations/"
+    gen:
+      go:
+        package: "reader"
+        out: "internal/reader"
+        emit_json_tags: true
+        emit_empty_slices: true

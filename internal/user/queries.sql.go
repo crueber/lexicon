@@ -202,6 +202,27 @@ func (q *Queries) GetUserSettings(ctx context.Context, userID int64) (UserSettin
 	return i, err
 }
 
+const getUserSettingsFull = `-- name: GetUserSettingsFull :one
+SELECT user_id, theme, book_cards_per_row, pdf_reader_setting, epub_reader_setting, comic_reader_setting, audiobook_reader_setting, sidebar_setting, dashboard_setting FROM user_settings WHERE user_id = ?
+`
+
+func (q *Queries) GetUserSettingsFull(ctx context.Context, userID int64) (UserSetting, error) {
+	row := q.db.QueryRowContext(ctx, getUserSettingsFull, userID)
+	var i UserSetting
+	err := row.Scan(
+		&i.UserID,
+		&i.Theme,
+		&i.BookCardsPerRow,
+		&i.PdfReaderSetting,
+		&i.EpubReaderSetting,
+		&i.ComicReaderSetting,
+		&i.AudiobookReaderSetting,
+		&i.SidebarSetting,
+		&i.DashboardSetting,
+	)
+	return i, err
+}
+
 const listUserLibraryIDs = `-- name: ListUserLibraryIDs :many
 SELECT library_id FROM user_library_permission WHERE user_id = ?
 `
@@ -279,6 +300,34 @@ UPDATE refresh_tokens SET revoked = 1 WHERE token_hash = ?
 
 func (q *Queries) RevokeRefreshToken(ctx context.Context, tokenHash string) error {
 	_, err := q.db.ExecContext(ctx, revokeRefreshToken, tokenHash)
+	return err
+}
+
+const updateEpubReaderSetting = `-- name: UpdateEpubReaderSetting :exec
+UPDATE user_settings SET epub_reader_setting = ? WHERE user_id = ?
+`
+
+type UpdateEpubReaderSettingParams struct {
+	EpubReaderSetting sql.NullString `json:"epub_reader_setting"`
+	UserID            int64          `json:"user_id"`
+}
+
+func (q *Queries) UpdateEpubReaderSetting(ctx context.Context, arg UpdateEpubReaderSettingParams) error {
+	_, err := q.db.ExecContext(ctx, updateEpubReaderSetting, arg.EpubReaderSetting, arg.UserID)
+	return err
+}
+
+const updatePdfReaderSetting = `-- name: UpdatePdfReaderSetting :exec
+UPDATE user_settings SET pdf_reader_setting = ? WHERE user_id = ?
+`
+
+type UpdatePdfReaderSettingParams struct {
+	PdfReaderSetting sql.NullString `json:"pdf_reader_setting"`
+	UserID           int64          `json:"user_id"`
+}
+
+func (q *Queries) UpdatePdfReaderSetting(ctx context.Context, arg UpdatePdfReaderSettingParams) error {
+	_, err := q.db.ExecContext(ctx, updatePdfReaderSetting, arg.PdfReaderSetting, arg.UserID)
 	return err
 }
 

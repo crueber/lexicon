@@ -129,3 +129,6 @@ SELECT b.id, b.library_id, b.folder_path, b.book_type, b.created_at, b.added_dat
 FROM book b
 LEFT JOIN book_metadata bm ON b.id = bm.book_id
 WHERE b.id = ? LIMIT 1;
+
+-- name: GetBookWithLibraryID :one
+SELECT b.id, b.library_id FROM book b WHERE b.id = ? LIMIT 1;
