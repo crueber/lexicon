@@ -18,6 +18,7 @@ import (
 	"github.com/crueber/lexicon/internal/book"
 	"github.com/crueber/lexicon/internal/dashboard"
 	"github.com/crueber/lexicon/internal/library"
+	"github.com/crueber/lexicon/internal/metadata"
 	"github.com/crueber/lexicon/internal/reader"
 	"github.com/crueber/lexicon/internal/shelf"
 	"github.com/crueber/lexicon/internal/storage"
@@ -40,6 +41,7 @@ type Server struct {
 	readerHandler    *reader.Handler
 	shelfHandler     *shelf.Handler
 	dashboardHandler *dashboard.Handler
+	metadataHandler  *metadata.Handler
 	hub              *ws.Hub
 	wsHandler        *ws.Handler
 	watcher          *library.Watcher
@@ -131,6 +133,11 @@ func New(cfg Config) (*Server, error) {
 		},
 	)
 
+	// Set up the metadata service and register providers.
+	metadataSvc := metadata.NewService(db, logger)
+	metadataSvc.RegisterProvider(metadata.NewGoogleBooksProvider(cfg.GoogleBooksAPIKey, logger))
+	metadataHdlr := metadata.NewHandler(metadataSvc, logger)
+
 	s := &Server{
 		cfg:              cfg,
 		db:               db,
@@ -144,6 +151,7 @@ func New(cfg Config) (*Server, error) {
 		readerHandler:    reader.NewHandler(db, logger),
 		shelfHandler:     shelfHdlr,
 		dashboardHandler: dashboard.NewHandler(db, logger),
+		metadataHandler:  metadataHdlr,
 		hub:              hub,
 		wsHandler:        wsHandler,
 		watcher:          watcher,

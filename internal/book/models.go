@@ -150,6 +150,26 @@ type LibraryPath struct {
 	Path      string `json:"path"`
 }
 
+type MetadataFetchJob struct {
+	ID        int64          `json:"id"`
+	BookID    int64          `json:"book_id"`
+	Status    string         `json:"status"`
+	Provider  sql.NullString `json:"provider"`
+	Error     sql.NullString `json:"error"`
+	CreatedAt string         `json:"created_at"`
+	UpdatedAt string         `json:"updated_at"`
+}
+
+type MetadataProposal struct {
+	ID         int64          `json:"id"`
+	BookID     int64          `json:"book_id"`
+	Provider   string         `json:"provider"`
+	ProviderID sql.NullString `json:"provider_id"`
+	Status     string         `json:"status"`
+	Data       string         `json:"data"`
+	CreatedAt  string         `json:"created_at"`
+}
+
 type Mood struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`

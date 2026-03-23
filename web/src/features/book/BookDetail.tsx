@@ -18,12 +18,14 @@ import {
   Trash2,
   BookOpenCheck,
   BookMarked,
+  Search,
 } from "lucide-solid";
 import { api } from "../../shared/api/client";
 import { useAuth } from "../auth/AuthProvider";
 import Button from "../../shared/ui/Button";
 import Skeleton from "../../shared/ui/Skeleton";
 import AddToShelfDialog from "../shelf/AddToShelfDialog";
+import MetadataSearch from "./MetadataSearch";
 import type { BookDetail as BookDetailType, BookFile, Shelf } from "../library/types";
 
 // ---- API ----
@@ -173,6 +175,7 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
   const [deleting, setDeleting] = createSignal(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
   const [showShelfDialog, setShowShelfDialog] = createSignal(false);
+  const [showMetadataSearch, setShowMetadataSearch] = createSignal(false);
 
   const isAudiobook = createMemo(() => book()?.bookType === "AUDIOBOOK");
 
@@ -239,6 +242,14 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
               >
                 <BookMarked class="h-4 w-4" />
                 Add to Shelf
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowMetadataSearch(true)}
+              >
+                <Search class="h-4 w-4" />
+                Find Metadata
               </Button>
               <Show when={auth.isAdmin()}>
                 <Show
@@ -494,6 +505,15 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
           setShowShelfDialog(false);
           void refetchBookShelves();
         }}
+      />
+    </Show>
+
+    {/* Metadata search panel */}
+    <Show when={showMetadataSearch() && book()}>
+      <MetadataSearch
+        bookId={props.bookId}
+        bookType={book()!.bookType}
+        onClose={() => setShowMetadataSearch(false)}
       />
     </Show>
     </>

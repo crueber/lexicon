@@ -88,6 +88,19 @@ func (s *Server) setupRoutes() {
 			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
 			s.dashboardHandler.Routes(r)
 		})
+
+		// Metadata routes (require auth).
+		r.Route("/metadata", func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			s.metadataHandler.Routes(r)
+		})
+
+		// Admin metadata settings routes (require auth + admin).
+		r.Route("/admin/settings", func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			r.Use(auth.RequireAdmin())
+			s.metadataHandler.AdminRoutes(r)
+		})
 	})
 
 	// Frontend: proxy to Vite in dev mode, serve embedded files in production.

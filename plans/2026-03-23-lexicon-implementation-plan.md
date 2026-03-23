@@ -2402,22 +2402,24 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 09
 
 **Changes**:
-- `internal/metadata/types.go` — MetadataProvider interface, MetadataQuery, MetadataResult types
-- `internal/metadata/service.go` — provider registry, search orchestration, proposal management
-- `internal/metadata/provider.go` — Google Books implementation
-- `migrations/009_metadata_jobs.up.sql` — metadata_fetch_jobs, metadata_fetch_proposals tables
-- `internal/metadata/handler.go` — search, proposals, accept/reject, field-lock endpoints
-- Per-field lock flags enforcement
-- Library metadata source configuration
+- [x] `internal/metadata/types.go` — MetadataProvider interface, MetadataQuery, MetadataResult types
+- [x] `internal/metadata/service.go` — provider registry, search orchestration, proposal management
+- [x] `internal/metadata/googlebooks.go` — Google Books implementation
+- [x] `migrations/008_metadata_jobs.up.sql` — metadata_fetch_jobs, metadata_fetch_proposals tables
+- [x] `internal/metadata/handler.go` — search, proposals, accept/reject, field-lock endpoints
+- [x] Per-field lock flags enforcement
+- [x] Library metadata source configuration
+- [x] `web/src/features/book/MetadataSearch.tsx` — metadata search panel
+- [x] `web/src/features/book/BookDetail.tsx` — "Find Metadata" button added
 
 **Verification**:
-- Search Google Books by title/author returns results
-- Search by ISBN returns results
-- Create proposal from search result
-- Accept proposal → book metadata updated
-- Reject proposal → no changes
-- Locked fields not overwritten
-- `go test ./...` passes
+- [x] Search Google Books by title/author returns results
+- [x] Search by ISBN returns results
+- [x] Create proposal from search result
+- [x] Accept proposal → book metadata updated
+- [x] Reject proposal → no changes
+- [x] Locked fields not overwritten
+- [x] `go test ./...` passes
 
 ---
 
