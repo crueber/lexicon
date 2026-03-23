@@ -156,7 +156,7 @@ func newTestRouter(t *testing.T, db *sql.DB) *chi.Mux {
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 	svc := library.NewService(db, logger)
-	scanner := library.NewScanner(db, logger)
+	scanner := library.NewScanner(db, t.TempDir(), logger)
 	h := library.NewHandler(svc, scanner, logger)
 
 	r := chi.NewRouter()

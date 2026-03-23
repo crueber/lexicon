@@ -1,8 +1,13 @@
 package library_test
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"database/sql"
+	"image"
+	"image/color"
+	"image/jpeg"
 	"os"
 	"path/filepath"
 	"testing"
@@ -99,7 +104,7 @@ func TestScanner_BookPerFile_CreatesBookAndFile(t *testing.T) {
 	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
 	lp := addLibraryPath(t, db, lib.ID, dir)
 
-	scanner := library.NewScanner(db, newTestLogger(t))
+	scanner := library.NewScanner(db, t.TempDir(), newTestLogger(t))
 	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
 	if err != nil {
 		t.Fatalf("ScanLibrary: %v", err)
@@ -131,7 +136,7 @@ func TestScanner_BookPerFile_SkipsUnsupportedFiles(t *testing.T) {
 	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
 	lp := addLibraryPath(t, db, lib.ID, dir)
 
-	scanner := library.NewScanner(db, newTestLogger(t))
+	scanner := library.NewScanner(db, t.TempDir(), newTestLogger(t))
 	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
 	if err != nil {
 		t.Fatalf("ScanLibrary: %v", err)
@@ -153,7 +158,7 @@ func TestScanner_BookPerFile_DetectsBookTypes(t *testing.T) {
 	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
 	lp := addLibraryPath(t, db, lib.ID, dir)
 
-	scanner := library.NewScanner(db, newTestLogger(t))
+	scanner := library.NewScanner(db, t.TempDir(), newTestLogger(t))
 	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
 	if err != nil {
 		t.Fatalf("ScanLibrary: %v", err)
@@ -191,7 +196,7 @@ func TestScanner_BookPerFile_FingerprintMoveDetection(t *testing.T) {
 	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
 	lp := addLibraryPath(t, db, lib.ID, dir)
 
-	scanner := library.NewScanner(db, newTestLogger(t))
+	scanner := library.NewScanner(db, t.TempDir(), newTestLogger(t))
 	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
 	if err != nil {
 		t.Fatalf("first ScanLibrary: %v", err)
@@ -250,7 +255,7 @@ func TestScanner_BookPerFile_FingerprintChangeDetection(t *testing.T) {
 	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
 	lp := addLibraryPath(t, db, lib.ID, dir)
 
-	scanner := library.NewScanner(db, newTestLogger(t))
+	scanner := library.NewScanner(db, t.TempDir(), newTestLogger(t))
 	if _, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp}); err != nil {
 		t.Fatalf("first ScanLibrary: %v", err)
 	}
@@ -280,7 +285,7 @@ func TestScanner_BookPerFile_IdempotentRescan(t *testing.T) {
 	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
 	lp := addLibraryPath(t, db, lib.ID, dir)
 
-	scanner := library.NewScanner(db, newTestLogger(t))
+	scanner := library.NewScanner(db, t.TempDir(), newTestLogger(t))
 
 	// First scan.
 	if _, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp}); err != nil {
@@ -314,7 +319,7 @@ func TestScanner_BookPerFile_CreatesBookMetadata(t *testing.T) {
 	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
 	lp := addLibraryPath(t, db, lib.ID, dir)
 
-	scanner := library.NewScanner(db, newTestLogger(t))
+	scanner := library.NewScanner(db, t.TempDir(), newTestLogger(t))
 	if _, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp}); err != nil {
 		t.Fatalf("ScanLibrary: %v", err)
 	}
@@ -344,7 +349,7 @@ func TestScanner_BookPerFolder_GroupsFilesIntoOneBook(t *testing.T) {
 	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FOLDER")
 	lp := addLibraryPath(t, db, lib.ID, dir)
 
-	scanner := library.NewScanner(db, newTestLogger(t))
+	scanner := library.NewScanner(db, t.TempDir(), newTestLogger(t))
 	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
 	if err != nil {
 		t.Fatalf("ScanLibrary: %v", err)
@@ -380,7 +385,7 @@ func TestScanner_BookPerFolder_SeparateFoldersSeparateBooks(t *testing.T) {
 	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FOLDER")
 	lp := addLibraryPath(t, db, lib.ID, dir)
 
-	scanner := library.NewScanner(db, newTestLogger(t))
+	scanner := library.NewScanner(db, t.TempDir(), newTestLogger(t))
 	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
 	if err != nil {
 		t.Fatalf("ScanLibrary: %v", err)
@@ -407,7 +412,7 @@ func TestScanner_BookPerFolder_AudiobookDetection(t *testing.T) {
 	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FOLDER")
 	lp := addLibraryPath(t, db, lib.ID, dir)
 
-	scanner := library.NewScanner(db, newTestLogger(t))
+	scanner := library.NewScanner(db, t.TempDir(), newTestLogger(t))
 	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
 	if err != nil {
 		t.Fatalf("ScanLibrary: %v", err)
@@ -441,7 +446,7 @@ func TestScanner_BookPerFolder_ComicDetection(t *testing.T) {
 	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FOLDER")
 	lp := addLibraryPath(t, db, lib.ID, dir)
 
-	scanner := library.NewScanner(db, newTestLogger(t))
+	scanner := library.NewScanner(db, t.TempDir(), newTestLogger(t))
 	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
 	if err != nil {
 		t.Fatalf("ScanLibrary: %v", err)
@@ -467,7 +472,7 @@ func TestScanner_BookPerFolder_AddsNewFilesToExistingBook(t *testing.T) {
 	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FOLDER")
 	lp := addLibraryPath(t, db, lib.ID, dir)
 
-	scanner := library.NewScanner(db, newTestLogger(t))
+	scanner := library.NewScanner(db, t.TempDir(), newTestLogger(t))
 	if _, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp}); err != nil {
 		t.Fatalf("first ScanLibrary: %v", err)
 	}
@@ -521,7 +526,7 @@ func TestScanner_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	scanner := library.NewScanner(db, newTestLogger(t))
+	scanner := library.NewScanner(db, t.TempDir(), newTestLogger(t))
 	_, err := scanner.ScanLibrary(ctx, lib, []library.LibraryPath{lp})
 	// Should return context error or partial result without panicking.
 	// The error may be nil if cancellation happened after the scan completed.
@@ -535,7 +540,7 @@ func TestScanner_EmptyDirectory(t *testing.T) {
 	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
 	lp := addLibraryPath(t, db, lib.ID, dir)
 
-	scanner := library.NewScanner(db, newTestLogger(t))
+	scanner := library.NewScanner(db, t.TempDir(), newTestLogger(t))
 	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
 	if err != nil {
 		t.Fatalf("ScanLibrary: %v", err)
@@ -558,7 +563,7 @@ func TestScanner_RecursiveDirectoryWalk(t *testing.T) {
 	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
 	lp := addLibraryPath(t, db, lib.ID, dir)
 
-	scanner := library.NewScanner(db, newTestLogger(t))
+	scanner := library.NewScanner(db, t.TempDir(), newTestLogger(t))
 	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
 	if err != nil {
 		t.Fatalf("ScanLibrary: %v", err)
@@ -566,5 +571,134 @@ func TestScanner_RecursiveDirectoryWalk(t *testing.T) {
 
 	if result.BooksAdded != 3 {
 		t.Errorf("BooksAdded = %d; want 3", result.BooksAdded)
+	}
+}
+
+// makeSmallJPEG creates a small JPEG image and returns its bytes.
+func makeSmallJPEG(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 100, 150))
+	for y := 0; y < 150; y++ {
+		for x := 0; x < 100; x++ {
+			img.Set(x, y, color.RGBA{R: 200, G: 100, B: 50, A: 255})
+		}
+	}
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 85}); err != nil {
+		t.Fatalf("encode jpeg: %v", err)
+	}
+	return buf.Bytes()
+}
+
+// makeMinimalEPUBWithCover creates a minimal EPUB zip file with an embedded cover image.
+func makeMinimalEPUBWithCover(t *testing.T, path string, coverBytes []byte) {
+	t.Helper()
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("create epub: %v", err)
+	}
+	defer f.Close()
+
+	w := zip.NewWriter(f)
+	defer w.Close()
+
+	// mimetype
+	mf, err := w.Create("mimetype")
+	if err != nil {
+		t.Fatalf("create mimetype: %v", err)
+	}
+	if _, err := mf.Write([]byte("application/epub+zip")); err != nil {
+		t.Fatalf("write mimetype: %v", err)
+	}
+
+	// META-INF/container.xml
+	cf, err := w.Create("META-INF/container.xml")
+	if err != nil {
+		t.Fatalf("create container.xml: %v", err)
+	}
+	containerXML := `<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`
+	if _, err := cf.Write([]byte(containerXML)); err != nil {
+		t.Fatalf("write container.xml: %v", err)
+	}
+
+	// OEBPS/content.opf
+	opf, err := w.Create("OEBPS/content.opf")
+	if err != nil {
+		t.Fatalf("create content.opf: %v", err)
+	}
+	opfXML := `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Test Book</dc:title>
+  </metadata>
+  <manifest>
+    <item id="cover-img" href="images/cover.jpg" media-type="image/jpeg" properties="cover-image"/>
+  </manifest>
+</package>`
+	if _, err := opf.Write([]byte(opfXML)); err != nil {
+		t.Fatalf("write content.opf: %v", err)
+	}
+
+	// OEBPS/images/cover.jpg
+	imgFile, err := w.Create("OEBPS/images/cover.jpg")
+	if err != nil {
+		t.Fatalf("create cover image: %v", err)
+	}
+	if _, err := imgFile.Write(coverBytes); err != nil {
+		t.Fatalf("write cover image: %v", err)
+	}
+}
+
+func TestScanner_BookPerFile_ExtractsCoverFromEPUB(t *testing.T) {
+	db := openTestDB(t)
+	dir := t.TempDir()
+	dataDir := t.TempDir()
+
+	// Create a minimal EPUB with a cover image.
+	epubPath := filepath.Join(dir, "book.epub")
+	coverBytes := makeSmallJPEG(t)
+	makeMinimalEPUBWithCover(t, epubPath, coverBytes)
+
+	lib := createLibraryInDB(t, db, "Test Library", "BOOK_PER_FILE")
+	lp := addLibraryPath(t, db, lib.ID, dir)
+
+	scanner := library.NewScanner(db, dataDir, newTestLogger(t))
+	result, err := scanner.ScanLibrary(context.Background(), lib, []library.LibraryPath{lp})
+	if err != nil {
+		t.Fatalf("ScanLibrary: %v", err)
+	}
+
+	if result.BooksAdded != 1 {
+		t.Fatalf("BooksAdded = %d; want 1", result.BooksAdded)
+	}
+	if len(result.Errors) != 0 {
+		t.Errorf("unexpected errors: %v", result.Errors)
+	}
+
+	// Verify the cover was extracted and saved.
+	books := listBooksForLibrary(t, db, lib.ID)
+	if len(books) != 1 {
+		t.Fatalf("expected 1 book; got %d", len(books))
+	}
+
+	q := book.New(db)
+	meta, err := q.GetBookMetadata(context.Background(), books[0].ID)
+	if err != nil {
+		t.Fatalf("GetBookMetadata: %v", err)
+	}
+
+	if !meta.CoverPath.Valid || meta.CoverPath.String == "" {
+		t.Error("expected cover_path to be set after scanning EPUB with cover")
+	} else {
+		// Verify the cover file actually exists on disk.
+		coverFilePath := filepath.Join(dataDir, meta.CoverPath.String)
+		if _, err := os.Stat(coverFilePath); err != nil {
+			t.Errorf("cover file not found at %q: %v", coverFilePath, err)
+		}
 	}
 }

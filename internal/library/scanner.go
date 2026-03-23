@@ -95,15 +95,17 @@ type ScanResult struct {
 
 // Scanner scans library directories and creates/updates book records.
 type Scanner struct {
-	db     *sql.DB
-	logger *slog.Logger
+	db      *sql.DB
+	dataDir string
+	logger  *slog.Logger
 }
 
 // NewScanner creates a new Scanner.
-func NewScanner(db *sql.DB, logger *slog.Logger) *Scanner {
+func NewScanner(db *sql.DB, dataDir string, logger *slog.Logger) *Scanner {
 	return &Scanner{
-		db:     db,
-		logger: logger,
+		db:      db,
+		dataDir: dataDir,
+		logger:  logger,
 	}
 }
 
@@ -357,6 +359,13 @@ func (s *Scanner) processFolderBookPerFolder(ctx context.Context, lib Library, d
 		bookID = newBook.ID
 		result.BooksAdded++
 		s.logger.Debug("created book for folder", "dir", dir, "book_id", bookID)
+
+		// Extract cover from the first file in the folder (non-fatal).
+		if len(files) > 0 {
+			firstExt := strings.ToLower(filepath.Ext(files[0]))
+			firstFormat := supportedFormats[firstExt]
+			s.extractAndSaveCover(ctx, bookID, files[0], firstFormat, bookType)
+		}
 	} else {
 		bookID = existingBook.ID
 	}
@@ -501,7 +510,43 @@ func (s *Scanner) createBookWithFile(ctx context.Context, libraryID int64, path,
 	result.FilesAdded++
 	s.logger.Debug("created book", "path", path, "book_id", book.ID, "type", bookType)
 
+	// Extract and save cover (non-fatal).
+	s.extractAndSaveCover(ctx, book.ID, path, format, bookType)
+
 	return nil
+}
+
+// extractAndSaveCover attempts to extract a cover from the given file and save
+// it to the data directory. Failures are logged at Debug level and do not
+// propagate — cover extraction is best-effort.
+func (s *Scanner) extractAndSaveCover(ctx context.Context, bookID int64, filePath, format, bookType string) {
+	if s.dataDir == "" {
+		return
+	}
+
+	rawBytes, _, err := storage.ExtractCover(filePath, format)
+	if err != nil {
+		s.logger.Debug("cover extraction failed", "path", filePath, "format", format, "error", err)
+		return
+	}
+	if rawBytes == nil {
+		return
+	}
+
+	isAudio := bookType == "AUDIOBOOK"
+	coverPath, err := storage.ProcessCover(rawBytes, bookID, s.dataDir, isAudio)
+	if err != nil {
+		s.logger.Debug("cover processing failed", "path", filePath, "book_id", bookID, "error", err)
+		return
+	}
+
+	bq := bookpkg.New(s.db)
+	if err := bq.UpdateBookCover(ctx, bookpkg.UpdateBookCoverParams{
+		CoverPath: sql.NullString{String: coverPath, Valid: true},
+		BookID:    bookID,
+	}); err != nil {
+		s.logger.Debug("update book cover failed", "book_id", bookID, "error", err)
+	}
 }
 
 // statFile returns the file size in bytes.

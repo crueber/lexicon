@@ -2112,21 +2112,21 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 07
 
 **Changes**:
-- `internal/storage/cover.go` — cover extraction per format (EPUB, PDF, CBZ, audio tags)
-- Thumbnail generation (200x300 crop-fit) using `disintegration/imaging`
-- Full-size cover (max 800px wide)
-- Decompression bomb protection (reject > 50MP)
-- `internal/storage/handler.go` — GET /api/books/{id}/cover (serve cover image)
-- Cover extraction integrated into scanner flow
-- Data directory structure: `/app/data/covers/books/{bookId}/`
+- [x] `internal/storage/cover.go` — cover extraction per format (EPUB, PDF, CBZ, audio tags)
+- [x] Thumbnail generation (200x300 crop-fit) using `disintegration/imaging`
+- [x] Full-size cover (max 800px wide)
+- [x] Decompression bomb protection (reject > 50MP)
+- [x] `internal/storage/handler.go` — GET /api/books/{id}/cover (serve cover image)
+- [x] Cover extraction integrated into scanner flow
+- [x] Data directory structure: `/app/data/covers/books/{bookId}/`
 
 **Verification**:
-- Scan a library with EPUB, PDF, CBZ files
-- Covers extracted and saved as JPEG
-- Thumbnails generated at correct dimensions
-- GET /api/books/{id}/cover returns the image
-- Books without covers return 404 (placeholder handled by frontend)
-- `go test ./...` passes
+- [x] Scan a library with EPUB, PDF, CBZ files
+- [x] Covers extracted and saved as JPEG
+- [x] Thumbnails generated at correct dimensions
+- [x] GET /api/books/{id}/cover returns the image
+- [x] Books without covers return 404 (placeholder handled by frontend)
+- [x] `go test ./...` passes
 
 ---
 

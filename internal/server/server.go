@@ -17,6 +17,7 @@ import (
 	"github.com/crueber/lexicon/internal/auth"
 	"github.com/crueber/lexicon/internal/book"
 	"github.com/crueber/lexicon/internal/library"
+	"github.com/crueber/lexicon/internal/storage"
 	"github.com/crueber/lexicon/internal/user"
 )
 
@@ -29,6 +30,7 @@ type Server struct {
 	authHandler    *auth.Handler
 	libraryHandler *library.Handler
 	bookHandler    *book.Handler
+	storageHandler *storage.Handler
 }
 
 // New creates a new Server with the given configuration, opens the database,
@@ -47,7 +49,7 @@ func New(cfg Config) (*Server, error) {
 	}
 
 	librarySvc := library.NewService(db, logger)
-	libraryScanner := library.NewScanner(db, logger)
+	libraryScanner := library.NewScanner(db, cfg.DataDir, logger)
 
 	s := &Server{
 		cfg:            cfg,
@@ -57,6 +59,7 @@ func New(cfg Config) (*Server, error) {
 		authHandler:    auth.NewHandler(db, cfg.JWTSecret, logger),
 		libraryHandler: library.NewHandler(librarySvc, libraryScanner, logger),
 		bookHandler:    book.NewHandler(db, logger),
+		storageHandler: storage.NewHandler(db, cfg.DataDir, logger),
 	}
 
 	if err := s.ensureDefaultAdmin(); err != nil {

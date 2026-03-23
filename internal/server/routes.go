@@ -42,6 +42,11 @@ func (s *Server) setupRoutes() {
 		r.Route("/books", func(r chi.Router) {
 			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
 			s.bookHandler.Routes(r)
+
+			// Cover serving routes nested under /books/{id}/cover.
+			r.Route("/{id}/cover", func(r chi.Router) {
+				s.storageHandler.Routes(r)
+			})
 		})
 	})
 
