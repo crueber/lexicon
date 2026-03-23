@@ -45,16 +45,26 @@ func openTestDB(t *testing.T) *sql.DB {
 
 	db.SetMaxOpenConns(1)
 
-	// Apply schema directly (avoid importing server package for migrations).
-	schema, err := os.ReadFile(filepath.Join("..", "..", "migrations", "001_users.up.sql"))
-	if err != nil {
-		db.Close()
-		t.Fatalf("read migration: %v", err)
+	// Apply all migrations (avoid importing server package for migrations).
+	// The login handler now queries user_library_permission (migration 002).
+	migrations := []string{
+		filepath.Join("..", "..", "migrations", "001_users.up.sql"),
+		filepath.Join("..", "..", "migrations", "002_libraries.up.sql"),
+		filepath.Join("..", "..", "migrations", "003_books.up.sql"),
+		filepath.Join("..", "..", "migrations", "004_taxonomy.up.sql"),
+		filepath.Join("..", "..", "migrations", "005_progress.up.sql"),
 	}
 
-	if _, err := db.Exec(string(schema)); err != nil {
-		db.Close()
-		t.Fatalf("apply migration: %v", err)
+	for _, m := range migrations {
+		schema, err := os.ReadFile(m)
+		if err != nil {
+			db.Close()
+			t.Fatalf("read migration %s: %v", m, err)
+		}
+		if _, err := db.Exec(string(schema)); err != nil {
+			db.Close()
+			t.Fatalf("apply migration %s: %v", m, err)
+		}
 	}
 
 	t.Cleanup(func() { db.Close() })

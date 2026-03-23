@@ -31,6 +31,12 @@ func (s *Server) setupRoutes() {
 				r.Patch("/me/password", s.authHandler.HandleChangePassword)
 			})
 		})
+
+		// Library routes (require auth; admin-only routes enforced inside Routes()).
+		r.Route("/libraries", func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			s.libraryHandler.Routes(r)
+		})
 	})
 
 	// Frontend: proxy to Vite in dev mode, serve embedded files in production.

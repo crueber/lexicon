@@ -136,6 +136,18 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	// Populate library IDs for non-admin users.
+	// Admins have access to all libraries, so we leave LibraryIDs nil.
+	if perms.Role != "ADMIN" {
+		libraryIDs, err := q.ListUserLibraryIDs(ctx, u.ID)
+		if err != nil {
+			h.logger.Error("list user library ids on login", "error", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		principal.LibraryIDs = libraryIDs
+	}
+
 	// Issue access token.
 	accessToken, err := IssueAccessToken(principal, h.secret)
 	if err != nil {
@@ -262,6 +274,17 @@ func (h *Handler) HandleRefresh(w http.ResponseWriter, r *http.Request) {
 			CanEditMetadata: perms.CanEditMetadata == 1,
 			OPDSAccess:      perms.OpdsAccess == 1,
 		},
+	}
+
+	// Populate library IDs for non-admin users on refresh.
+	if perms.Role != "ADMIN" {
+		libraryIDs, err := q.ListUserLibraryIDs(ctx, u.ID)
+		if err != nil {
+			h.logger.Error("list user library ids on refresh", "error", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		principal.LibraryIDs = libraryIDs
 	}
 
 	// Issue new access token.

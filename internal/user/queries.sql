@@ -70,3 +70,6 @@ DELETE FROM refresh_tokens WHERE expires_at < datetime('now') OR revoked = 1;
 -- name: UpsertAppSetting :exec
 INSERT INTO app_settings (key, value) VALUES (?, ?)
 ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+
+-- name: ListUserLibraryIDs :many
+SELECT library_id FROM user_library_permission WHERE user_id = ?;

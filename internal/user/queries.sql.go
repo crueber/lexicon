@@ -202,6 +202,33 @@ func (q *Queries) GetUserSettings(ctx context.Context, userID int64) (UserSettin
 	return i, err
 }
 
+const listUserLibraryIDs = `-- name: ListUserLibraryIDs :many
+SELECT library_id FROM user_library_permission WHERE user_id = ?
+`
+
+func (q *Queries) ListUserLibraryIDs(ctx context.Context, userID int64) ([]int64, error) {
+	rows, err := q.db.QueryContext(ctx, listUserLibraryIDs, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var library_id int64
+		if err := rows.Scan(&library_id); err != nil {
+			return nil, err
+		}
+		items = append(items, library_id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUsers = `-- name: ListUsers :many
 SELECT id, username, email, password_hash, name, enabled, created_at FROM users ORDER BY username
 `

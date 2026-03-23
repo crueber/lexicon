@@ -10,6 +10,15 @@ import (
 	"database/sql"
 )
 
+const clearUserLibraryPermissions = `-- name: ClearUserLibraryPermissions :exec
+DELETE FROM user_library_permission WHERE user_id = ?
+`
+
+func (q *Queries) ClearUserLibraryPermissions(ctx context.Context, userID int64) error {
+	_, err := q.db.ExecContext(ctx, clearUserLibraryPermissions, userID)
+	return err
+}
+
 const createLibrary = `-- name: CreateLibrary :one
 INSERT INTO library (name, icon, icon_color, organization_mode, file_naming_pattern)
 VALUES (?, ?, ?, ?, ?)
@@ -98,6 +107,17 @@ func (q *Queries) GetLibraryByID(ctx context.Context, id int64) (Library, error)
 	return i, err
 }
 
+const getLibraryPathByID = `-- name: GetLibraryPathByID :one
+SELECT id, library_id, path FROM library_path WHERE id = ? LIMIT 1
+`
+
+func (q *Queries) GetLibraryPathByID(ctx context.Context, id int64) (LibraryPath, error) {
+	row := q.db.QueryRowContext(ctx, getLibraryPathByID, id)
+	var i LibraryPath
+	err := row.Scan(&i.ID, &i.LibraryID, &i.Path)
+	return i, err
+}
+
 const grantLibraryAccess = `-- name: GrantLibraryAccess :exec
 INSERT OR IGNORE INTO user_library_permission (user_id, library_id) VALUES (?, ?)
 `
@@ -174,33 +194,6 @@ func (q *Queries) ListLibraryPaths(ctx context.Context, libraryID int64) ([]Libr
 	return items, nil
 }
 
-const listUserLibraryIDs = `-- name: ListUserLibraryIDs :many
-SELECT library_id FROM user_library_permission WHERE user_id = ?
-`
-
-func (q *Queries) ListUserLibraryIDs(ctx context.Context, userID int64) ([]int64, error) {
-	rows, err := q.db.QueryContext(ctx, listUserLibraryIDs, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []int64{}
-	for rows.Next() {
-		var library_id int64
-		if err := rows.Scan(&library_id); err != nil {
-			return nil, err
-		}
-		items = append(items, library_id)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const revokeLibraryAccess = `-- name: RevokeLibraryAccess :exec
 DELETE FROM user_library_permission WHERE user_id = ? AND library_id = ?
 `
@@ -212,15 +205,6 @@ type RevokeLibraryAccessParams struct {
 
 func (q *Queries) RevokeLibraryAccess(ctx context.Context, arg RevokeLibraryAccessParams) error {
 	_, err := q.db.ExecContext(ctx, revokeLibraryAccess, arg.UserID, arg.LibraryID)
-	return err
-}
-
-const setUserLibraryPermissions = `-- name: SetUserLibraryPermissions :exec
-DELETE FROM user_library_permission WHERE user_id = ?
-`
-
-func (q *Queries) SetUserLibraryPermissions(ctx context.Context, userID int64) error {
-	_, err := q.db.ExecContext(ctx, setUserLibraryPermissions, userID)
 	return err
 }
 

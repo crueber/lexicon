@@ -15,16 +15,18 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/crueber/lexicon/internal/auth"
+	"github.com/crueber/lexicon/internal/library"
 	"github.com/crueber/lexicon/internal/user"
 )
 
 // Server is the main HTTP server for Lexicon.
 type Server struct {
-	cfg         Config
-	db          *sql.DB
-	router      *chi.Mux
-	logger      *slog.Logger
-	authHandler *auth.Handler
+	cfg            Config
+	db             *sql.DB
+	router         *chi.Mux
+	logger         *slog.Logger
+	authHandler    *auth.Handler
+	libraryHandler *library.Handler
 }
 
 // New creates a new Server with the given configuration, opens the database,
@@ -42,12 +44,15 @@ func New(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("run migrations: %w", err)
 	}
 
+	librarySvc := library.NewService(db, logger)
+
 	s := &Server{
-		cfg:         cfg,
-		db:          db,
-		router:      chi.NewRouter(),
-		logger:      logger,
-		authHandler: auth.NewHandler(db, cfg.JWTSecret, logger),
+		cfg:            cfg,
+		db:             db,
+		router:         chi.NewRouter(),
+		logger:         logger,
+		authHandler:    auth.NewHandler(db, cfg.JWTSecret, logger),
+		libraryHandler: library.NewHandler(librarySvc, logger),
 	}
 
 	if err := s.ensureDefaultAdmin(); err != nil {

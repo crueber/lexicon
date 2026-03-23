@@ -22,11 +22,11 @@ INSERT INTO library_path (library_id, path) VALUES (?, ?) RETURNING *;
 -- name: ListLibraryPaths :many
 SELECT * FROM library_path WHERE library_id = ?;
 
+-- name: GetLibraryPathByID :one
+SELECT * FROM library_path WHERE id = ? LIMIT 1;
+
 -- name: DeleteLibraryPath :exec
 DELETE FROM library_path WHERE id = ?;
-
--- name: ListUserLibraryIDs :many
-SELECT library_id FROM user_library_permission WHERE user_id = ?;
 
 -- name: GrantLibraryAccess :exec
 INSERT OR IGNORE INTO user_library_permission (user_id, library_id) VALUES (?, ?);
@@ -34,5 +34,5 @@ INSERT OR IGNORE INTO user_library_permission (user_id, library_id) VALUES (?, ?
 -- name: RevokeLibraryAccess :exec
 DELETE FROM user_library_permission WHERE user_id = ? AND library_id = ?;
 
--- name: SetUserLibraryPermissions :exec
+-- name: ClearUserLibraryPermissions :exec
 DELETE FROM user_library_permission WHERE user_id = ?;

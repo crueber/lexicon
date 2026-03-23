@@ -2066,18 +2066,17 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 03, Phase 05
 
 **Changes**:
-- `internal/library/handler.go` — GET/POST/PUT/DELETE /api/libraries, library path management
-- `internal/library/service.go` — business logic, user-library permission filtering
-- `internal/library/queries.sql` — library queries
-- `migrations/006_user_library_permissions.up.sql` — user_library_permission table (if not in 001)
-- Route registration in `internal/server/routes.go`
-- Admin-only guards on create/update/delete
+- [x] `internal/library/handler.go` — GET/POST/PUT/DELETE /api/libraries, library path management
+- [x] `internal/library/service.go` — business logic, user-library permission filtering
+- [x] `internal/library/queries.sql` — library queries
+- [x] Route registration in `internal/server/routes.go`
+- [x] Admin-only guards on create/update/delete
 
 **Verification**:
-- Admin can create a library with paths via API
-- Non-admin users only see libraries they have access to
-- Library CRUD operations work correctly
-- `go test ./...` passes
+- [x] Admin can create a library with paths via API
+- [x] Non-admin users only see libraries they have access to
+- [x] Library CRUD operations work correctly
+- [x] `go test ./...` passes
 
 ---
 
