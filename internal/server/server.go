@@ -19,6 +19,7 @@ import (
 	"github.com/crueber/lexicon/internal/library"
 	"github.com/crueber/lexicon/internal/storage"
 	"github.com/crueber/lexicon/internal/user"
+	"github.com/crueber/lexicon/internal/ws"
 )
 
 // Server is the main HTTP server for Lexicon.
@@ -31,6 +32,9 @@ type Server struct {
 	libraryHandler *library.Handler
 	bookHandler    *book.Handler
 	storageHandler *storage.Handler
+	hub            *ws.Hub
+	wsHandler      *ws.Handler
+	watcher        *library.Watcher
 }
 
 // New creates a new Server with the given configuration, opens the database,
@@ -51,6 +55,15 @@ func New(cfg Config) (*Server, error) {
 	librarySvc := library.NewService(db, logger)
 	libraryScanner := library.NewScanner(db, cfg.DataDir, logger)
 
+	hub := ws.NewHub(logger)
+	wsHandler := ws.NewHandler(hub, cfg.JWTSecret, logger)
+
+	watcher, err := library.NewWatcher(db, libraryScanner, hub, logger)
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("create file watcher: %w", err)
+	}
+
 	s := &Server{
 		cfg:            cfg,
 		db:             db,
@@ -60,6 +73,9 @@ func New(cfg Config) (*Server, error) {
 		libraryHandler: library.NewHandler(librarySvc, libraryScanner, logger),
 		bookHandler:    book.NewHandler(db, logger),
 		storageHandler: storage.NewHandler(db, cfg.DataDir, logger),
+		hub:            hub,
+		wsHandler:      wsHandler,
+		watcher:        watcher,
 	}
 
 	if err := s.ensureDefaultAdmin(); err != nil {
@@ -119,6 +135,16 @@ func (s *Server) Start() error {
 		Handler: s.router,
 	}
 
+	// Start the file watcher in a background goroutine.
+	watcherCtx, watcherCancel := context.WithCancel(context.Background())
+	watcherDone := make(chan struct{})
+	go func() {
+		defer close(watcherDone)
+		if err := s.watcher.Start(watcherCtx); err != nil {
+			s.logger.Error("file watcher error", "error", err)
+		}
+	}()
+
 	// Channel to capture server errors from ListenAndServe.
 	errCh := make(chan error, 1)
 	go func() {
@@ -136,8 +162,16 @@ func (s *Server) Start() error {
 	case sig := <-quit:
 		s.logger.Info("received shutdown signal", "signal", sig.String())
 	case err := <-errCh:
+		watcherCancel()
+		_ = s.watcher.Close()
+		<-watcherDone
 		return fmt.Errorf("server listen: %w", err)
 	}
+
+	// Stop the file watcher.
+	watcherCancel()
+	_ = s.watcher.Close()
+	<-watcherDone
 
 	// Give active connections 10 seconds to finish.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

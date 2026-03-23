@@ -16,6 +16,9 @@ func (s *Server) setupRoutes() {
 	// Health check endpoint.
 	s.router.Get("/health", s.handleHealth)
 
+	// WebSocket endpoint (auth handled inside the handler via token query param).
+	s.wsHandler.Routes(s.router)
+
 	// API routes.
 	s.router.Route("/api", func(r chi.Router) {
 		// Auth routes (public).

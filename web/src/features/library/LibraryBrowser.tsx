@@ -3,6 +3,7 @@ import {
   createResource,
   createSignal,
   createMemo,
+  onCleanup,
   For,
   Show,
   Suspense,
@@ -12,6 +13,7 @@ import { useParams, useNavigate } from "@solidjs/router";
 import { ChevronLeft, ChevronRight, ScanLine } from "lucide-solid";
 import { api } from "../../shared/api/client";
 import { useAuth } from "../auth/AuthProvider";
+import { useWS } from "../../shared/ws/WSProvider";
 import Button from "../../shared/ui/Button";
 import Skeleton from "../../shared/ui/Skeleton";
 import BookCard from "../book/BookCard";
@@ -160,6 +162,7 @@ const Pagination: Component<{
 const LibraryBrowserInner: Component<{ libraryId: number }> = (props) => {
   const navigate = useNavigate();
   const auth = useAuth();
+  const ws = useWS();
 
   const [page, setPage] = createSignal(1);
   const [bookTypeFilter, setBookTypeFilter] = createSignal<BookTypeFilter>("ALL");
@@ -178,7 +181,27 @@ const LibraryBrowserInner: Component<{ libraryId: number }> = (props) => {
   }));
 
   // Fetch books — refetches whenever booksParams changes.
-  const [booksData] = createResource(booksParams, fetchBooks);
+  const [booksData, { refetch: refetchBooks }] = createResource(booksParams, fetchBooks);
+
+  // Subscribe to WebSocket events to refetch books when the library changes.
+  const unsubScanComplete = ws.on("LIBRARY_SCAN_COMPLETE", (msg) => {
+    const payload = msg.payload as { libraryId?: number };
+    if (payload.libraryId === props.libraryId) {
+      void refetchBooks();
+    }
+  });
+
+  const unsubBookAdded = ws.on("BOOK_ADDED", (msg) => {
+    const payload = msg.payload as { libraryId?: number };
+    if (payload.libraryId === props.libraryId) {
+      void refetchBooks();
+    }
+  });
+
+  onCleanup(() => {
+    unsubScanComplete();
+    unsubBookAdded();
+  });
 
   const totalPages = createMemo(() => {
     const data = booksData();

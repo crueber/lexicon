@@ -1,4 +1,4 @@
-import { type Component, Show, createSignal, createMemo } from "solid-js";
+import { type Component, type JSX, Show, createSignal, createMemo } from "solid-js";
 import { Router, Route, A, useLocation } from "@solidjs/router";
 import {
   BookOpen,
@@ -20,6 +20,7 @@ import LibraryList from "./features/library/LibraryList";
 import LibraryBrowser from "./features/library/LibraryBrowser";
 import BookDetail from "./features/book/BookDetail";
 import ToastContainer from "./shared/ui/Toast";
+import WSProvider from "./shared/ws/WSProvider";
 
 const ShelvesStub: Component = () => (
   <div class="flex flex-1 items-center justify-center p-8">
@@ -238,6 +239,17 @@ const AppLayout: Component<{ children?: any }> = (props) => {
   );
 };
 
+// AuthenticatedProviders wraps children with providers that depend on auth state.
+// Must be rendered inside AuthProvider.
+const AuthenticatedProviders: Component<{ children: JSX.Element }> = (props) => {
+  const auth = useAuth();
+  return (
+    <WSProvider isAuthenticated={auth.isAuthenticated}>
+      {props.children}
+    </WSProvider>
+  );
+};
+
 // --- App ---
 
 const App: Component = () => {
@@ -245,8 +257,10 @@ const App: Component = () => {
     <Router
       root={(props) => (
         <AuthProvider>
-          {props.children}
-          <ToastContainer />
+          <AuthenticatedProviders>
+            {props.children}
+            <ToastContainer />
+          </AuthenticatedProviders>
         </AuthProvider>
       )}
     >
