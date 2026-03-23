@@ -1969,18 +1969,18 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 01
 
 **Changes**:
-- `internal/server/` — SQLite connection setup with WAL mode, busy timeout, foreign keys
-- `sqlc.yaml` configuration for SQLite
-- `migrations/001_users.up.sql` — users, user_permissions, user_settings, refresh_tokens, app_settings tables
-- `migrations/001_users.down.sql`
-- First sqlc query files for user CRUD
-- Database initialization on startup (run migrations)
+- [x] `internal/server/` — SQLite connection setup with WAL mode, busy timeout, foreign keys
+- [x] `sqlc.yaml` configuration for SQLite
+- [x] `migrations/001_users.up.sql` — users, user_permissions, user_settings, refresh_tokens, app_settings tables
+- [x] `migrations/001_users.down.sql`
+- [x] First sqlc query files for user CRUD
+- [x] Database initialization on startup (run migrations)
 
 **Verification**:
-- Server starts and creates `lexicon.db` in data dir
-- Migrations apply cleanly
-- `sqlc generate` produces valid Go code
-- `go test ./...` passes
+- [x] Server starts and creates `lexicon.db` in data dir
+- [x] Migrations apply cleanly
+- [x] `sqlc generate` produces valid Go code
+- [x] `go test ./...` passes
 
 ---
 

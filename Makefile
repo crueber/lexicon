@@ -4,6 +4,7 @@ BINARY := lexicon
 WEB_DIR := web
 DIST_DIR := $(WEB_DIR)/dist
 EMBED_DIR := internal/server/dist
+DATA_DIR ?= ./data
 
 # Build Go binary with embedded frontend.
 build: embed-frontend
@@ -51,13 +52,15 @@ sqlc-generate:
 docker-build:
 	docker build -t lexicon .
 
-# Apply all pending migrations.
+# Apply all pending migrations (uses the Go binary).
 migrate-up:
-	@echo "migrate-up: not yet implemented (requires database module)"
+	@echo "Migrations run automatically on server startup."
+	@echo "To run manually, start the server: make run"
 
-# Roll back last migration.
+# Roll back last migration (requires golang-migrate CLI).
 migrate-down:
-	@echo "migrate-down: not yet implemented (requires database module)"
+	@command -v migrate >/dev/null 2>&1 || { echo "Install golang-migrate CLI: go install -tags 'sqlite' github.com/golang-migrate/migrate/v4/cmd/migrate@latest"; exit 1; }
+	migrate -source "file://migrations" -database "sqlite://$(DATA_DIR)/lexicon.db" down 1
 
 # Remove build artifacts.
 clean:

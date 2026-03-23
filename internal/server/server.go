@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,29 +12,35 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/caarlos0/env/v11"
 	"github.com/go-chi/chi/v5"
 )
 
 // Server is the main HTTP server for Lexicon.
 type Server struct {
 	cfg    Config
+	db     *sql.DB
 	router *chi.Mux
 	logger *slog.Logger
 }
 
-// New creates a new Server by parsing configuration from environment variables
-// and setting up the router and middleware.
-func New() (*Server, error) {
-	cfg, err := env.ParseAs[Config]()
+// New creates a new Server with the given configuration, opens the database,
+// runs migrations, and sets up the router and middleware.
+func New(cfg Config) (*Server, error) {
+	logger := newLogger(cfg.LogLevel, cfg.LogFormat)
+
+	db, err := OpenDatabase(cfg.DataDir)
 	if err != nil {
-		return nil, fmt.Errorf("parse config: %w", err)
+		return nil, fmt.Errorf("open database: %w", err)
 	}
 
-	logger := newLogger(cfg.LogLevel, cfg.LogFormat)
+	if err := RunMigrations(db, logger); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("run migrations: %w", err)
+	}
 
 	s := &Server{
 		cfg:    cfg,
+		db:     db,
 		router: chi.NewRouter(),
 		logger: logger,
 	}
@@ -85,6 +92,11 @@ func (s *Server) Start() error {
 
 	if err := srv.Shutdown(ctx); err != nil {
 		return fmt.Errorf("server shutdown: %w", err)
+	}
+
+	// Close the database after the HTTP server has stopped accepting requests.
+	if err := s.db.Close(); err != nil {
+		s.logger.Error("database close error", "error", err)
 	}
 
 	s.logger.Info("server stopped gracefully")
