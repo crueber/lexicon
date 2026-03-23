@@ -88,3 +88,26 @@ export interface BookDetail {
   tags: Tag[];
   files: BookFile[];
 }
+
+export interface Shelf {
+  id: number;
+  userId: number;
+  name: string;
+  description?: string;
+  icon?: string;
+  iconColor?: string;
+  isPublic: boolean;
+  bookCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShelfBook {
+  id: number;
+  libraryId: number;
+  bookType: string;
+  title?: string;
+  coverPath?: string;
+  addedAt: string;
+  sortOrder: number;
+}

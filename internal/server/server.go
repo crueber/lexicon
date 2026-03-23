@@ -18,6 +18,7 @@ import (
 	"github.com/crueber/lexicon/internal/book"
 	"github.com/crueber/lexicon/internal/library"
 	"github.com/crueber/lexicon/internal/reader"
+	"github.com/crueber/lexicon/internal/shelf"
 	"github.com/crueber/lexicon/internal/storage"
 	"github.com/crueber/lexicon/internal/task"
 	"github.com/crueber/lexicon/internal/user"
@@ -35,6 +36,7 @@ type Server struct {
 	bookHandler    *book.Handler
 	storageHandler *storage.Handler
 	readerHandler  *reader.Handler
+	shelfHandler   *shelf.Handler
 	hub            *ws.Hub
 	wsHandler      *ws.Handler
 	watcher        *library.Watcher
@@ -82,6 +84,12 @@ func New(cfg Config) (*Server, error) {
 		return taskRunner.Enqueue(context.Background(), taskType, payload)
 	})
 
+	shelfSvc := shelf.NewService(db, logger)
+	shelfHdlr := shelf.NewHandler(shelfSvc, logger)
+
+	bookHdlr := book.NewHandler(db, logger)
+	bookHdlr.WithShelfHandler(shelfHdlr)
+
 	s := &Server{
 		cfg:            cfg,
 		db:             db,
@@ -89,9 +97,10 @@ func New(cfg Config) (*Server, error) {
 		logger:         logger,
 		authHandler:    auth.NewHandler(db, cfg.JWTSecret, logger),
 		libraryHandler: libraryHandler,
-		bookHandler:    book.NewHandler(db, logger),
+		bookHandler:    bookHdlr,
 		storageHandler: storage.NewHandler(db, cfg.DataDir, logger),
 		readerHandler:  reader.NewHandler(db, logger),
+		shelfHandler:   shelfHdlr,
 		hub:            hub,
 		wsHandler:      wsHandler,
 		watcher:        watcher,

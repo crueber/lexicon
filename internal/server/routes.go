@@ -52,6 +52,12 @@ func (s *Server) setupRoutes() {
 			})
 		})
 
+		// Shelf routes (require auth).
+		r.Route("/shelves", func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			s.shelfHandler.Routes(r)
+		})
+
 		// Task routes (require auth; admin-only routes enforced inside Routes()).
 		r.Route("/tasks", func(r chi.Router) {
 			r.Use(auth.RequireAuth(s.cfg.JWTSecret))

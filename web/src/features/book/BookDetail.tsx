@@ -17,17 +17,23 @@ import {
   ChevronUp,
   Trash2,
   BookOpenCheck,
+  BookMarked,
 } from "lucide-solid";
 import { api } from "../../shared/api/client";
 import { useAuth } from "../auth/AuthProvider";
 import Button from "../../shared/ui/Button";
 import Skeleton from "../../shared/ui/Skeleton";
-import type { BookDetail as BookDetailType, BookFile } from "../library/types";
+import AddToShelfDialog from "../shelf/AddToShelfDialog";
+import type { BookDetail as BookDetailType, BookFile, Shelf } from "../library/types";
 
 // ---- API ----
 
 async function fetchBookDetail(id: number): Promise<BookDetailType> {
   return api<BookDetailType>(`/books/${id}`);
+}
+
+async function fetchBookShelves(id: number): Promise<Shelf[]> {
+  return api<Shelf[]>(`/books/${id}/shelves`);
 }
 
 // ---- Helpers ----
@@ -158,10 +164,15 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
   const auth = useAuth();
 
   const [book] = createResource(() => props.bookId, fetchBookDetail);
+  const [bookShelves, { refetch: refetchBookShelves }] = createResource(
+    () => props.bookId,
+    fetchBookShelves
+  );
   const [imgError, setImgError] = createSignal(false);
   const [descExpanded, setDescExpanded] = createSignal(false);
   const [deleting, setDeleting] = createSignal(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
+  const [showShelfDialog, setShowShelfDialog] = createSignal(false);
 
   const isAudiobook = createMemo(() => book()?.bookType === "AUDIOBOOK");
 
@@ -200,6 +211,7 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
   }
 
   return (
+    <>
     <Show when={book()} fallback={<BookDetailSkeleton />}>
       {(b) => (
         <div class="flex flex-1 flex-col">
@@ -219,6 +231,14 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
               >
                 <BookOpenCheck class="h-4 w-4" />
                 Read
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowShelfDialog(true)}
+              >
+                <BookMarked class="h-4 w-4" />
+                Add to Shelf
               </Button>
               <Show when={auth.isAdmin()}>
                 <Show
@@ -436,11 +456,47 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
                   </div>
                 </div>
               </Show>
+
+              {/* Shelves */}
+              <Show when={(bookShelves() ?? []).length > 0}>
+                <div class="flex flex-col gap-2">
+                  <span class="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    In Shelves
+                  </span>
+                  <div class="flex flex-wrap gap-2">
+                    <For each={bookShelves() ?? []}>
+                      {(shelf) => (
+                        <button
+                          onClick={() => navigate(`/shelves/${shelf.id}`)}
+                          class="flex items-center gap-1.5 rounded-full bg-indigo-600/20 px-3 py-1 text-xs font-medium text-indigo-300 transition-colors hover:bg-indigo-600/30"
+                        >
+                          <Show when={shelf.icon}>
+                            <span>{shelf.icon}</span>
+                          </Show>
+                          {shelf.name}
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </div>
+              </Show>
             </div>
           </div>
         </div>
       )}
     </Show>
+
+    {/* Add to Shelf dialog */}
+    <Show when={showShelfDialog()}>
+      <AddToShelfDialog
+        bookId={props.bookId}
+        onClose={() => {
+          setShowShelfDialog(false);
+          void refetchBookShelves();
+        }}
+      />
+    </Show>
+    </>
   );
 };
 

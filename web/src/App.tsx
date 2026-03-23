@@ -22,14 +22,10 @@ import BookDetail from "./features/book/BookDetail";
 import EpubReader from "./features/reader/EpubReader";
 import PdfReader from "./features/reader/PdfReader";
 import ReaderDispatch from "./features/reader/ReaderDispatch";
+import ShelfList from "./features/shelf/ShelfList";
+import ShelfDetail from "./features/shelf/ShelfDetail";
 import ToastContainer from "./shared/ui/Toast";
 import WSProvider from "./shared/ws/WSProvider";
-
-const ShelvesStub: Component = () => (
-  <div class="flex flex-1 items-center justify-center p-8">
-    <p class="text-slate-400">Shelves — coming soon</p>
-  </div>
-);
 
 const NotebookStub: Component = () => (
   <div class="flex flex-1 items-center justify-center p-8">
@@ -277,7 +273,8 @@ const App: Component = () => {
         <Route path="/libraries" component={LibraryList} />
         <Route path="/libraries/:id/books" component={LibraryBrowser} />
         <Route path="/books/:id" component={BookDetail} />
-        <Route path="/shelves" component={ShelvesStub} />
+        <Route path="/shelves" component={ShelfList} />
+        <Route path="/shelves/:id" component={ShelfDetail} />
         <Route path="/notebook" component={NotebookStub} />
         <Route path="/settings" component={SettingsStub} />
         <Route path="/admin/users" component={AdminUsersStub} />

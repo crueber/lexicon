@@ -15,10 +15,17 @@ import (
 	"github.com/crueber/lexicon/internal/auth"
 )
 
+// shelfHandler is the interface for the shelf handler's book-shelves endpoint.
+// Defined here at the consumer to keep the interface small.
+type shelfHandler interface {
+	HandleListShelvesForBook(w http.ResponseWriter, r *http.Request)
+}
+
 // Handler handles HTTP requests for book management.
 type Handler struct {
-	db     *sql.DB
-	logger *slog.Logger
+	db           *sql.DB
+	logger       *slog.Logger
+	shelfHandler shelfHandler
 }
 
 // NewHandler creates a new book Handler.
@@ -29,6 +36,11 @@ func NewHandler(db *sql.DB, logger *slog.Logger) *Handler {
 	}
 }
 
+// WithShelfHandler sets the shelf handler for the /api/books/{id}/shelves endpoint.
+func (h *Handler) WithShelfHandler(sh shelfHandler) {
+	h.shelfHandler = sh
+}
+
 // Routes registers all book routes on the given router.
 // RequireAuth must already be applied by the caller.
 func (h *Handler) Routes(r chi.Router) {
@@ -36,6 +48,16 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/{id}", h.handleGet)
 	r.Delete("/{id}", h.handleDelete)
 	r.Get("/{id}/files", h.handleListFiles)
+	r.Get("/{id}/shelves", h.handleListShelves)
+}
+
+// handleListShelves handles GET /api/books/{id}/shelves.
+func (h *Handler) handleListShelves(w http.ResponseWriter, r *http.Request) {
+	if h.shelfHandler == nil {
+		writeJSON(w, http.StatusOK, []struct{}{})
+		return
+	}
+	h.shelfHandler.HandleListShelvesForBook(w, r)
 }
 
 // listParams holds the validated parameters for listing books.

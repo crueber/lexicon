@@ -2319,13 +2319,20 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Parallelizable with**: Phase 14, Phase 15
 
 **Changes**:
-- `migrations/008_shelves.up.sql` — shelf, book_shelf_mapping tables
-- `internal/shelf/handler.go` — shelf CRUD, add/remove books
-- `internal/shelf/service.go` — business logic
-- `web/src/features/shelf/ShelfList.tsx` — list of user's shelves
-- `web/src/features/shelf/ShelfDetail.tsx` — books in a shelf
-- Add-to-shelf dialog on book detail page
-- Routes: /shelves, /shelves/{id}
+- [x] `migrations/007_shelves.up.sql` — shelf, shelf_book tables
+- [x] `internal/shelf/queries.sql` — sqlc queries for shelf operations
+- [x] `internal/shelf/service.go` — business logic
+- [x] `internal/shelf/handler.go` — shelf CRUD, add/remove books
+- [x] `internal/book/handler.go` — added `/api/books/{id}/shelves` endpoint via shelf handler
+- [x] `internal/server/server.go` — wired up shelf service and handler
+- [x] `internal/server/routes.go` — mounted shelf routes at `/api/shelves`
+- [x] `web/src/features/library/types.ts` — added Shelf and ShelfBook types
+- [x] `web/src/features/shelf/ShelfList.tsx` — list of user's shelves
+- [x] `web/src/features/shelf/ShelfDetail.tsx` — books in a shelf
+- [x] `web/src/features/shelf/AddToShelfDialog.tsx` — add-to-shelf dialog
+- [x] `web/src/features/book/BookDetail.tsx` — wired up Add to Shelf button and shelf chips
+- [x] `web/src/App.tsx` — replaced ShelvesStub with real ShelfList and ShelfDetail routes
+- [x] `sqlc.yaml` — added shelf queries entry
 
 **Verification**:
 - Create a shelf with name and icon

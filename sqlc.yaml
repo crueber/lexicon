@@ -45,3 +45,12 @@ sql:
         out: "internal/reader"
         emit_json_tags: true
         emit_empty_slices: true
+  - engine: "sqlite"
+    queries: "internal/shelf/queries.sql"
+    schema: "migrations/"
+    gen:
+      go:
+        package: "shelf"
+        out: "internal/shelf"
+        emit_json_tags: true
+        emit_empty_slices: true

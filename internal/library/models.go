@@ -182,6 +182,25 @@ type Series struct {
 	Name string `json:"name"`
 }
 
+type Shelf struct {
+	ID          int64          `json:"id"`
+	UserID      int64          `json:"user_id"`
+	Name        string         `json:"name"`
+	Description sql.NullString `json:"description"`
+	Icon        sql.NullString `json:"icon"`
+	IconColor   sql.NullString `json:"icon_color"`
+	IsPublic    int64          `json:"is_public"`
+	CreatedAt   string         `json:"created_at"`
+	UpdatedAt   string         `json:"updated_at"`
+}
+
+type ShelfBook struct {
+	ShelfID   int64  `json:"shelf_id"`
+	BookID    int64  `json:"book_id"`
+	AddedAt   string `json:"added_at"`
+	SortOrder int64  `json:"sort_order"`
+}
+
 type Tag struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
