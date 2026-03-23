@@ -1,0 +1,51 @@
+# Binaries
+lexicon
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go build/test artifacts
+*.test
+*.out
+*.prof
+/vendor/
+
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
+# Frontend
+web/node_modules/
+web/dist/
+web/.vite/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+credentials.json
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Data directory (runtime)
+data/
+
+# Coverage
+coverage.out
+coverage.html
+
+# Git worktrees
+.worktrees/
