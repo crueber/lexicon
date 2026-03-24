@@ -143,6 +143,30 @@ type ComicMetadatum struct {
 	CommunityRating sql.NullFloat64 `json:"community_rating"`
 }
 
+type KoboDevice struct {
+	ID         int64          `json:"id"`
+	UserID     int64          `json:"user_id"`
+	DeviceID   string         `json:"device_id"`
+	DeviceName sql.NullString `json:"device_name"`
+	Model      sql.NullString `json:"model"`
+	Firmware   sql.NullString `json:"firmware"`
+	LastSyncAt sql.NullString `json:"last_sync_at"`
+	CreatedAt  string         `json:"created_at"`
+}
+
+type KoboReadingState struct {
+	ID                 int64           `json:"id"`
+	UserID             int64           `json:"user_id"`
+	BookFileID         int64           `json:"book_file_id"`
+	ContentID          string          `json:"content_id"`
+	Status             sql.NullString  `json:"status"`
+	PercentRead        sql.NullFloat64 `json:"percent_read"`
+	CurrentCfi         sql.NullString  `json:"current_cfi"`
+	RestOfBookEstimate sql.NullInt64   `json:"rest_of_book_estimate"`
+	TimeSpentReading   sql.NullInt64   `json:"time_spent_reading"`
+	LastModified       sql.NullString  `json:"last_modified"`
+}
+
 type Library struct {
 	ID                int64          `json:"id"`
 	Name              string         `json:"name"`

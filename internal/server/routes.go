@@ -122,6 +122,17 @@ func (s *Server) setupRoutes() {
 		s.opdsHandler.Routes(r)
 	})
 
+	// Kobo sync routes (no JWT auth — Kobo uses X-Kobo-UserKey token auth).
+	s.router.Route("/kobo", func(r chi.Router) {
+		s.koboHandler.Routes(r)
+	})
+
+	// Kobo token management (requires JWT auth).
+	s.router.Route("/api/kobo", func(r chi.Router) {
+		r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+		s.koboHandler.TokenRoutes(r)
+	})
+
 	// Frontend: proxy to Vite in dev mode, serve embedded files in production.
 	if s.cfg.DevMode {
 		s.router.Handle("/*", s.viteProxy())

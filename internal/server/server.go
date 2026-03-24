@@ -17,6 +17,7 @@ import (
 	"github.com/crueber/lexicon/internal/auth"
 	"github.com/crueber/lexicon/internal/book"
 	"github.com/crueber/lexicon/internal/dashboard"
+	"github.com/crueber/lexicon/internal/kobo"
 	"github.com/crueber/lexicon/internal/library"
 	"github.com/crueber/lexicon/internal/metadata"
 	"github.com/crueber/lexicon/internal/notebook"
@@ -46,6 +47,7 @@ type Server struct {
 	dashboardHandler *dashboard.Handler
 	metadataHandler  *metadata.Handler
 	opdsHandler      *opds.Handler
+	koboHandler      *kobo.Handler
 	hub              *ws.Hub
 	wsHandler        *ws.Handler
 	watcher          *library.Watcher
@@ -146,6 +148,16 @@ func New(cfg Config) (*Server, error) {
 	metadataSvc.RegisterProvider(metadata.NewAudibleProvider(logger))
 	metadataHdlr := metadata.NewHandler(metadataSvc, logger)
 
+	koboHdlr := kobo.NewHandler(db, cfg.DataDir, logger)
+	// Inject a principal extractor to avoid an import cycle between kobo and auth.
+	koboHdlr.WithPrincipalExtractor(func(r *http.Request) (int64, bool) {
+		p := auth.PrincipalFromContext(r.Context())
+		if p == nil {
+			return 0, false
+		}
+		return p.UserID, true
+	})
+
 	s := &Server{
 		cfg:              cfg,
 		db:               db,
@@ -162,6 +174,7 @@ func New(cfg Config) (*Server, error) {
 		dashboardHandler: dashboard.NewHandler(db, logger),
 		metadataHandler:  metadataHdlr,
 		opdsHandler:      opds.NewHandler(db, logger),
+		koboHandler:      koboHdlr,
 		hub:              hub,
 		wsHandler:        wsHandler,
 		watcher:          watcher,

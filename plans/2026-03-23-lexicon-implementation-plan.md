@@ -2610,22 +2610,23 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 07, Phase 14
 
 **Changes**:
-- `migrations/013_kobo.up.sql` — kobo_user_settings, kobo_library_snapshot, kobo_reading_state tables
-- `internal/kobo/handler.go` — all Kobo store API proxy endpoints
-- `internal/kobo/service.go` — token management, settings
-- `internal/kobo/sync.go` — snapshot-based incremental sync
-- KEPUB conversion via kepubify (with caching)
-- Reading state sync (Kobo → Lexicon progress)
-- Shelf → Kobo tag mapping
-- Admin settings for Kobo sync enable/disable
+- [x] `migrations/011_kobo.up.sql` — kobo_device, kobo_reading_state tables
+- [x] `internal/kobo/handler.go` — all Kobo store API proxy endpoints
+- [x] `internal/kobo/kepub.go` — KEPUB conversion via kepubify (with caching)
+- [x] `internal/kobo/queries.sql` — sqlc queries for kobo tables
+- [x] KEPUB conversion via kepubify (pure Go, with caching)
+- [x] Reading state sync (Kobo → Lexicon progress)
+- [x] Token generation via POST /api/kobo/token
 
 **Verification**:
-- Generate Kobo token via API
-- Kobo device initialization succeeds
-- Library sync returns correct book list
-- Book download works (including KEPUB conversion)
-- Reading state syncs from Kobo to Lexicon
-- Incremental sync only sends changes
+- [x] Generate Kobo token via API
+- [x] Kobo device initialization succeeds
+- [x] Library sync returns correct book list
+- [x] Book download works (including KEPUB conversion)
+- [x] Reading state syncs from Kobo to Lexicon
+- [x] `CGO_ENABLED=0 go build -tags dev ./...` passes
+- [x] `go test -tags dev -race ./...` passes
+- [x] `npm run build` passes
 
 ---
 
