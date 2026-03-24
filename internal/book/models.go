@@ -8,6 +8,21 @@ import (
 	"database/sql"
 )
 
+type Annotation struct {
+	ID         int64          `json:"id"`
+	UserID     int64          `json:"user_id"`
+	BookID     int64          `json:"book_id"`
+	BookFileID sql.NullInt64  `json:"book_file_id"`
+	Type       string         `json:"type"`
+	Cfi        sql.NullString `json:"cfi"`
+	PageNumber sql.NullInt64  `json:"page_number"`
+	Text       sql.NullString `json:"text"`
+	Note       sql.NullString `json:"note"`
+	Color      string         `json:"color"`
+	CreatedAt  string         `json:"created_at"`
+	UpdatedAt  string         `json:"updated_at"`
+}
+
 type AppSetting struct {
 	Key   string         `json:"key"`
 	Value sql.NullString `json:"value"`

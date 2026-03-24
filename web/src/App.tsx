@@ -10,7 +10,7 @@ import {
   LogOut,
   Menu,
   X,
-  Notebook,
+  Notebook as NotebookIcon,
 } from "lucide-solid";
 import AuthProvider, { useAuth } from "./features/auth/AuthProvider";
 import LoginPage from "./features/auth/LoginPage";
@@ -30,16 +30,9 @@ import ShelfDetail from "./features/shelf/ShelfDetail";
 import MagicShelfBuilder from "./features/shelf/MagicShelfBuilder";
 import MagicShelfDetail from "./features/shelf/MagicShelfDetail";
 import UserManagement from "./features/admin/UserManagement";
+import Notebook from "./features/notebook/Notebook";
 import ToastContainer from "./shared/ui/Toast";
 import WSProvider from "./shared/ws/WSProvider";
-
-const NotebookStub: Component = () => (
-  <div class="flex flex-1 items-center justify-center p-8">
-    <p class="text-slate-400">Notebook — coming soon</p>
-  </div>
-);
-
-
 
 const AdminSettingsStub: Component = () => (
   <div class="flex flex-1 items-center justify-center p-8">
@@ -95,7 +88,7 @@ const Sidebar: Component = () => {
         <NavItem href="/" icon={LayoutDashboard} label="Dashboard" />
         <NavItem href="/libraries" icon={Library} label="Libraries" />
         <NavItem href="/shelves" icon={BookMarked} label="Shelves" />
-        <NavItem href="/notebook" icon={Notebook} label="Notebook" />
+        <NavItem href="/notebook" icon={NotebookIcon} label="Notebook" />
 
         <Show when={auth.isAdmin()}>
           <div class="mt-6 mb-2 px-3">
@@ -150,7 +143,7 @@ const MobileNav: Component = () => {
         <MobileNavItem href="/" icon={LayoutDashboard} label="Home" />
         <MobileNavItem href="/libraries" icon={Library} label="Libraries" />
         <MobileNavItem href="/shelves" icon={BookMarked} label="Shelves" />
-        <MobileNavItem href="/notebook" icon={Notebook} label="Notebook" />
+        <MobileNavItem href="/notebook" icon={NotebookIcon} label="Notebook" />
         <button
           onClick={() => setMenuOpen((v) => !v)}
           class="flex flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 text-slate-400 hover:text-slate-200 transition-colors"
@@ -276,7 +269,7 @@ const App: Component = () => {
         <Route path="/magic-shelves/new" component={MagicShelfBuilder} />
         <Route path="/magic-shelves/:id" component={MagicShelfDetail} />
         <Route path="/magic-shelves/:id/edit" component={MagicShelfBuilder} />
-        <Route path="/notebook" component={NotebookStub} />
+        <Route path="/notebook" component={Notebook} />
         <Route path="/settings" component={SettingsPage} />
         <Route path="/admin/users" component={UserManagement} />
         <Route path="/admin/settings" component={AdminSettingsStub} />

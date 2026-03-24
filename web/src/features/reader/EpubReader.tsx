@@ -18,6 +18,8 @@ import {
   Sun,
   Moon,
   BookOpen,
+  Highlighter,
+  Trash2,
 } from "lucide-solid";
 import { api, getAccessToken } from "../../shared/api/client";
 
@@ -43,6 +45,18 @@ interface TocItem {
   href: string;
   label: string;
   subitems?: TocItem[];
+}
+
+interface Annotation {
+  id: number;
+  bookId: number;
+  bookFileId: number | null;
+  type: string;
+  cfi: string | null;
+  text: string | null;
+  note: string | null;
+  color: string;
+  createdAt: string;
 }
 
 // ---- Default settings ----
@@ -87,6 +101,27 @@ const marginSizes: Record<NonNullable<EpubReaderSettings["margins"]>, string> =
     medium: "8%",
     large: "16%",
   };
+
+// ---- Annotation colors ----
+
+const annotationColors = ["yellow", "green", "blue", "pink", "purple"] as const;
+type AnnotationColor = (typeof annotationColors)[number];
+
+const highlightFills: Record<AnnotationColor, string> = {
+  yellow: "rgba(250,204,21,0.35)",
+  green: "rgba(74,222,128,0.35)",
+  blue: "rgba(96,165,250,0.35)",
+  pink: "rgba(244,114,182,0.35)",
+  purple: "rgba(167,139,250,0.35)",
+};
+
+const colorDotClasses: Record<AnnotationColor, string> = {
+  yellow: "bg-yellow-400",
+  green: "bg-green-400",
+  blue: "bg-blue-400",
+  pink: "bg-pink-400",
+  purple: "bg-purple-400",
+};
 
 // ---- API helpers ----
 
@@ -138,6 +173,50 @@ async function saveSettings(
   }
 }
 
+async function fetchAnnotations(bookId: string): Promise<Annotation[]> {
+  try {
+    return await api<Annotation[]>(`/reader/books/${bookId}/annotations`);
+  } catch {
+    return [];
+  }
+}
+
+async function createAnnotation(
+  bookId: string,
+  fileId: number,
+  cfi: string,
+  text: string,
+  color: AnnotationColor,
+): Promise<Annotation | null> {
+  try {
+    return await api<Annotation>(`/reader/books/${bookId}/annotations`, {
+      method: "POST",
+      body: JSON.stringify({
+        bookFileId: fileId,
+        type: "HIGHLIGHT",
+        cfi,
+        text,
+        color,
+      }),
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function deleteAnnotationApi(
+  bookId: string,
+  annotationId: number,
+): Promise<void> {
+  try {
+    await api(`/reader/books/${bookId}/annotations/${annotationId}`, {
+      method: "DELETE",
+    });
+  } catch {
+    // Non-fatal.
+  }
+}
+
 // ---- Debounce helper ----
 
 function debounce<T extends (...args: Parameters<T>) => void>(
@@ -165,12 +244,23 @@ const EpubReader: Component = () => {
   const [showUI, setShowUI] = createSignal(true);
   const [showSettings, setShowSettings] = createSignal(false);
   const [showToc, setShowToc] = createSignal(false);
+  const [showAnnotations, setShowAnnotations] = createSignal(false);
   const [bookTitle, setBookTitle] = createSignal("");
   const [chapterTitle, setChapterTitle] = createSignal("");
   const [progressPct, setProgressPct] = createSignal(0);
   const [toc, setToc] = createSignal<TocItem[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
+
+  // Annotation state.
+  const [annotations, setAnnotations] = createSignal<Annotation[]>([]);
+  // Highlight popup: position + selected CFI + text.
+  const [highlightPopup, setHighlightPopup] = createSignal<{
+    x: number;
+    y: number;
+    cfi: string;
+    text: string;
+  } | null>(null);
 
   // Reader settings.
   const [settings, setSettings] = createSignal<EpubReaderSettings>(defaultSettings);
@@ -185,7 +275,7 @@ const EpubReader: Component = () => {
     setShowUI(true);
     clearTimeout(hideTimer);
     hideTimer = setTimeout(() => {
-      if (!showSettings() && !showToc()) {
+      if (!showSettings() && !showToc() && !showAnnotations()) {
         setShowUI(false);
       }
     }, 3000);
@@ -228,6 +318,28 @@ const EpubReader: Component = () => {
     epub.rendition.themes.select("default");
   }
 
+  // Apply all stored highlights to the rendition.
+  function applyHighlights(list: Annotation[]) {
+    if (!epub.rendition) return;
+    for (const a of list) {
+      if (a.cfi && a.type === "HIGHLIGHT") {
+        const fill = highlightFills[(a.color as AnnotationColor) ?? "yellow"] ?? highlightFills.yellow;
+        try {
+          epub.rendition.annotations.add(
+            "highlight",
+            a.cfi,
+            {},
+            undefined,
+            "highlight",
+            { fill, "fill-opacity": "1" },
+          );
+        } catch {
+          // CFI may not be valid on current page — ignore.
+        }
+      }
+    }
+  }
+
   onMount(async () => {
     const fileId = searchParams.fileId;
     if (!fileId) {
@@ -250,6 +362,10 @@ const EpubReader: Component = () => {
       ...(savedSettings ?? {}),
     };
     setSettings(mergedSettings);
+
+    // Load existing annotations.
+    const existingAnnotations = await fetchAnnotations(params.id);
+    setAnnotations(existingAnnotations);
 
     // Dynamically import epubjs to avoid SSR issues.
     const { default: ePub } = await import("epubjs");
@@ -307,6 +423,48 @@ const EpubReader: Component = () => {
             setChapterTitle(chapter.label.trim());
           }
         }
+
+        // Re-apply highlights after page change.
+        applyHighlights(annotations());
+      });
+
+      // Listen for text selection to show highlight popup.
+      epub.rendition.on("selected", (cfiRange: string, contents: any) => {
+        const selection = contents?.window?.getSelection?.();
+        const selectedText = selection?.toString?.()?.trim() ?? "";
+        if (!selectedText) {
+          setHighlightPopup(null);
+          return;
+        }
+
+        // Get position from the iframe's bounding rect.
+        const iframeEl = containerRef.querySelector("iframe");
+        const iframeRect = iframeEl?.getBoundingClientRect();
+        const range = selection?.getRangeAt?.(0);
+        const rangeRect = range?.getBoundingClientRect?.();
+
+        if (iframeRect && rangeRect) {
+          setHighlightPopup({
+            x: iframeRect.left + rangeRect.left + rangeRect.width / 2,
+            y: iframeRect.top + rangeRect.top - 8,
+            cfi: cfiRange,
+            text: selectedText,
+          });
+        } else {
+          // Fallback: center of container.
+          const rect = containerRef.getBoundingClientRect();
+          setHighlightPopup({
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2,
+            cfi: cfiRange,
+            text: selectedText,
+          });
+        }
+      });
+
+      // Dismiss popup when clicking elsewhere in the rendition.
+      epub.rendition.on("click", () => {
+        setHighlightPopup(null);
       });
 
       // Restore saved progress.
@@ -336,6 +494,8 @@ const EpubReader: Component = () => {
       } else if (e.key === "Escape") {
         setShowSettings(false);
         setShowToc(false);
+        setShowAnnotations(false);
+        setHighlightPopup(null);
       }
     }
 
@@ -361,6 +521,11 @@ const EpubReader: Component = () => {
     applySettings(settings());
   });
 
+  // Re-apply highlights whenever annotations change.
+  createEffect(() => {
+    applyHighlights(annotations());
+  });
+
   function prevPage() {
     epub.rendition?.prev();
     resetHideTimer();
@@ -376,6 +541,11 @@ const EpubReader: Component = () => {
     setShowToc(false);
   }
 
+  function navigateToAnnotation(cfi: string) {
+    epub.rendition?.display(cfi);
+    setShowAnnotations(false);
+  }
+
   function updateSetting<K extends keyof EpubReaderSettings>(
     key: K,
     value: EpubReaderSettings[K],
@@ -388,6 +558,55 @@ const EpubReader: Component = () => {
     if (key === "flow" && epub.rendition) {
       epub.rendition.flow(value as string);
     }
+  }
+
+  async function handleHighlightColor(color: AnnotationColor) {
+    const popup = highlightPopup();
+    if (!popup) return;
+
+    const fileId = searchParams.fileId;
+    if (!fileId) return;
+
+    setHighlightPopup(null);
+
+    const annotation = await createAnnotation(
+      params.id,
+      Number(fileId),
+      popup.cfi,
+      popup.text,
+      color,
+    );
+
+    if (annotation) {
+      setAnnotations((prev) => [annotation, ...prev]);
+      // Apply the new highlight immediately.
+      const fill = highlightFills[color];
+      try {
+        epub.rendition?.annotations.add(
+          "highlight",
+          popup.cfi,
+          {},
+          undefined,
+          "highlight",
+          { fill, "fill-opacity": "1" },
+        );
+      } catch {
+        // Ignore.
+      }
+    }
+  }
+
+  async function handleDeleteAnnotation(annotation: Annotation) {
+    await deleteAnnotationApi(params.id, annotation.id);
+    // Remove from rendition.
+    if (annotation.cfi) {
+      try {
+        epub.rendition?.annotations.remove(annotation.cfi, "highlight");
+      } catch {
+        // Ignore.
+      }
+    }
+    setAnnotations((prev) => prev.filter((a) => a.id !== annotation.id));
   }
 
   const currentTheme = () => themeStyles[settings().theme ?? "dark"];
@@ -456,8 +675,20 @@ const EpubReader: Component = () => {
           </Show>
           <button
             onClick={() => {
+              setShowAnnotations((v) => !v);
+              setShowToc(false);
+              setShowSettings(false);
+            }}
+            class="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+            title="Annotations"
+          >
+            <Highlighter class="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => {
               setShowToc((v) => !v);
               setShowSettings(false);
+              setShowAnnotations(false);
             }}
             class="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
             title="Table of contents"
@@ -468,6 +699,7 @@ const EpubReader: Component = () => {
             onClick={() => {
               setShowSettings((v) => !v);
               setShowToc(false);
+              setShowAnnotations(false);
             }}
             class="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
             title="Reader settings"
@@ -479,6 +711,31 @@ const EpubReader: Component = () => {
 
       {/* EPUB render area */}
       <div ref={containerRef} class="flex-1" />
+
+      {/* Highlight color popup */}
+      <Show when={highlightPopup()}>
+        <div
+          class="absolute z-50 flex items-center gap-1 rounded-lg border border-white/20 p-1.5 shadow-xl"
+          style={{
+            background: "rgba(15,15,30,0.95)",
+            "backdrop-filter": "blur(12px)",
+            left: `${highlightPopup()!.x}px`,
+            top: `${highlightPopup()!.y}px`,
+            transform: "translate(-50%, -100%)",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <For each={annotationColors}>
+            {(color) => (
+              <button
+                onClick={() => handleHighlightColor(color)}
+                class={`h-6 w-6 rounded-full transition-transform hover:scale-110 ${colorDotClasses[color]}`}
+                title={`Highlight ${color}`}
+              />
+            )}
+          </For>
+        </div>
+      </Show>
 
       {/* Bottom toolbar */}
       <div
@@ -543,6 +800,69 @@ const EpubReader: Component = () => {
             )}
           </For>
         </nav>
+      </div>
+
+      {/* Annotations panel */}
+      <div
+        class={`absolute bottom-0 left-0 top-0 z-40 w-80 overflow-y-auto transition-transform duration-300 ${
+          showAnnotations() ? "translate-x-0" : "-translate-x-full"
+        }`}
+        style={{ background: "rgba(15,15,30,0.95)", "backdrop-filter": "blur(12px)" }}
+      >
+        <div class="flex items-center justify-between border-b border-white/10 px-4 py-3">
+          <h2 class="text-sm font-semibold text-slate-200">
+            Highlights ({annotations().length})
+          </h2>
+          <button
+            onClick={() => setShowAnnotations(false)}
+            class="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
+          >
+            <X class="h-4 w-4" />
+          </button>
+        </div>
+        <div class="flex flex-col gap-2 p-3">
+          <Show
+            when={annotations().length > 0}
+            fallback={
+              <p class="px-2 py-4 text-sm text-slate-500">
+                Select text to create a highlight
+              </p>
+            }
+          >
+            <For each={annotations()}>
+              {(annotation) => (
+                <div
+                  class={`rounded-lg border p-3 ${annotationColorClass(annotation.color)}`}
+                >
+                  <div class="flex items-start justify-between gap-2">
+                    <button
+                      class="flex-1 min-w-0 text-left"
+                      onClick={() => annotation.cfi && navigateToAnnotation(annotation.cfi)}
+                    >
+                      <Show when={annotation.text}>
+                        <p class="text-xs leading-relaxed line-clamp-3">
+                          "{annotation.text}"
+                        </p>
+                      </Show>
+                      <Show when={annotation.note}>
+                        <p class="mt-1 text-xs text-slate-400 italic">
+                          {annotation.note}
+                        </p>
+                      </Show>
+                    </button>
+                    <button
+                      onClick={() => handleDeleteAnnotation(annotation)}
+                      class="shrink-0 rounded p-1 text-slate-500 hover:bg-white/10 hover:text-red-400 transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 class="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </For>
+          </Show>
+        </div>
       </div>
 
       {/* Settings panel */}
@@ -720,18 +1040,32 @@ const EpubReader: Component = () => {
       </div>
 
       {/* Overlay to close panels when clicking outside */}
-      <Show when={showToc() || showSettings()}>
+      <Show when={showToc() || showSettings() || showAnnotations()}>
         <div
           class="absolute inset-0 z-[35]"
           onClick={() => {
             setShowToc(false);
             setShowSettings(false);
+            setShowAnnotations(false);
           }}
         />
       </Show>
     </div>
   );
 };
+
+// ---- Annotation color helper ----
+
+function annotationColorClass(color: string): string {
+  const classes: Record<string, string> = {
+    yellow: "border-yellow-400/40 bg-yellow-400/10",
+    green: "border-green-400/40 bg-green-400/10",
+    blue: "border-blue-400/40 bg-blue-400/10",
+    pink: "border-pink-400/40 bg-pink-400/10",
+    purple: "border-purple-400/40 bg-purple-400/10",
+  };
+  return classes[color] ?? classes.yellow;
+}
 
 // ---- ThemeButton sub-component ----
 

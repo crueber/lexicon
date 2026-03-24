@@ -65,3 +65,12 @@ sql:
         out: "internal/metadata"
         emit_json_tags: true
         emit_empty_slices: true
+  - engine: "sqlite"
+    queries: "internal/notebook/queries.sql"
+    schema: "migrations/"
+    gen:
+      go:
+        package: "notebook"
+        out: "internal/notebook"
+        emit_json_tags: true
+        emit_empty_slices: true

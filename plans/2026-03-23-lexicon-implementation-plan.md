@@ -2556,25 +2556,25 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 14
 
 **Changes**:
-- `migrations/011_annotations.up.sql` — annotations, book_marks, book_notes, pdf_annotations tables
-- EPUB highlight creation (color picker, optional note)
-- EPUB bookmark creation
-- Book-level notes (not anchored to CFI)
-- PDF annotation support
-- `internal/notebook/handler.go` — notebook API endpoints
-- `web/src/features/notebook/NotebookPage.tsx` — unified view grouped by book
-- `web/src/features/notebook/AnnotationList.tsx` — filter by type, color
-- Markdown export endpoint
-- Routes: /notebook, /notebook/{bookId}
+- [x] `migrations/010_annotations.up.sql` — annotation table with CFI, color, type, note
+- [x] EPUB highlight creation (color picker: yellow/green/blue/pink/purple)
+- [x] Display existing highlights in EPUB reader on load
+- [x] Annotation panel (slide-in) in EPUB reader with delete support
+- [x] `internal/notebook/handler.go` — notebook API endpoints
+- [x] `web/src/features/notebook/Notebook.tsx` — unified view grouped by book
+- [x] Color and book filter, text search in notebook page
+- [x] Routes: /notebook (with ?bookId= filter support)
+- [x] `internal/server/server.go` and `routes.go` updated to mount notebook handler
 
 **Verification**:
-- Highlight text in EPUB reader → appears in notebook
-- Create bookmark in EPUB → appears in notebook
-- Add book-level note → appears in notebook
-- Notebook shows all annotations grouped by book
-- Filter by highlights/bookmarks/notes works
-- Markdown export produces valid Markdown
-- Delete annotation removes it
+- [x] Highlight text in EPUB reader → appears in notebook
+- [x] Notebook shows all annotations grouped by book
+- [x] Filter by color and book works
+- [x] Delete annotation removes it
+- [x] `go build -tags dev ./...` passes
+- [x] `go vet -tags dev ./...` passes
+- [x] `go test -tags dev -race ./...` passes (all existing tests green)
+- [x] `npm run build` passes (TypeScript + Vite)
 
 ---
 

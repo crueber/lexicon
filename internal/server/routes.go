@@ -87,6 +87,14 @@ func (s *Server) setupRoutes() {
 		r.Route("/reader", func(r chi.Router) {
 			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
 			s.readerHandler.Routes(r)
+			// Annotation endpoints live under /api/reader/books/{bookId}/annotations.
+			s.notebookHandler.ReaderRoutes(r)
+		})
+
+		// Notebook routes (require auth).
+		r.Route("/notebook", func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			s.notebookHandler.NotebookRoutes(r)
 		})
 
 		// Dashboard routes (require auth).
