@@ -167,6 +167,25 @@ type KoboReadingState struct {
 	LastModified       sql.NullString  `json:"last_modified"`
 }
 
+type KoreaderProgress struct {
+	ID             int64          `json:"id"`
+	KoreaderUserID int64          `json:"koreader_user_id"`
+	Document       string         `json:"document"`
+	Progress       string         `json:"progress"`
+	Percentage     float64        `json:"percentage"`
+	Device         sql.NullString `json:"device"`
+	DeviceID       sql.NullString `json:"device_id"`
+	Timestamp      int64          `json:"timestamp"`
+}
+
+type KoreaderUser struct {
+	ID          int64         `json:"id"`
+	UserID      sql.NullInt64 `json:"user_id"`
+	Username    string        `json:"username"`
+	PasswordMd5 string        `json:"password_md5"`
+	CreatedAt   string        `json:"created_at"`
+}
+
 type Library struct {
 	ID                int64          `json:"id"`
 	Name              string         `json:"name"`

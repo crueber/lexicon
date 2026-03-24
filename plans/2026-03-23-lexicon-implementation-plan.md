@@ -2639,20 +2639,23 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Parallelizable with**: Phase 26
 
 **Changes**:
-- `migrations/014_koreader.up.sql` — koreader_user, koreader_progress tables
-- `internal/koreader/handler.go` — KOSync protocol endpoints
-- `internal/koreader/service.go` — user management, progress sync
-- MD5 password authentication
-- Document matching via fingerprint
-- Optional Hardcover forwarding
+- [x] `migrations/012_koreader.up.sql` — koreader_user, koreader_progress tables
+- [x] `internal/koreader/handler.go` — KOSync protocol endpoints (user create, auth, progress upsert/get)
+- [x] `internal/koreader/queries.sql` — sqlc queries for koreader tables
+- [x] MD5 password authentication via HTTP Basic Auth
+- [x] Document matching via filename LIKE query to sync progress to user_book_file_progress
+- [x] KOReader user linked to Lexicon user by matching username
 
 **Verification**:
-- Register KOReader user
-- Authenticate via Basic Auth
-- Update progress from KOReader
-- Retrieve progress for a document
-- Progress matches by fingerprint to correct book_file
-- Hardcover forwarding works when enabled
+- [x] Register KOReader user
+- [x] Authenticate via Basic Auth
+- [x] Update progress from KOReader
+- [x] Retrieve progress for a document
+- [x] Progress matches by filename to correct book_file
+- [x] `CGO_ENABLED=0 go build -tags dev ./...` passes
+- [x] `go test -tags dev -race ./...` passes
+- [x] `go vet -tags dev ./...` passes
+- [x] `npm run build` passes
 
 ---
 

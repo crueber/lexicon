@@ -18,6 +18,7 @@ import (
 	"github.com/crueber/lexicon/internal/book"
 	"github.com/crueber/lexicon/internal/dashboard"
 	"github.com/crueber/lexicon/internal/kobo"
+	"github.com/crueber/lexicon/internal/koreader"
 	"github.com/crueber/lexicon/internal/library"
 	"github.com/crueber/lexicon/internal/metadata"
 	"github.com/crueber/lexicon/internal/notebook"
@@ -48,6 +49,7 @@ type Server struct {
 	metadataHandler  *metadata.Handler
 	opdsHandler      *opds.Handler
 	koboHandler      *kobo.Handler
+	koreaderHandler  *koreader.Handler
 	hub              *ws.Hub
 	wsHandler        *ws.Handler
 	watcher          *library.Watcher
@@ -158,6 +160,8 @@ func New(cfg Config) (*Server, error) {
 		return p.UserID, true
 	})
 
+	koreaderHdlr := koreader.NewHandler(db, logger)
+
 	s := &Server{
 		cfg:              cfg,
 		db:               db,
@@ -175,6 +179,7 @@ func New(cfg Config) (*Server, error) {
 		metadataHandler:  metadataHdlr,
 		opdsHandler:      opds.NewHandler(db, logger),
 		koboHandler:      koboHdlr,
+		koreaderHandler:  koreaderHdlr,
 		hub:              hub,
 		wsHandler:        wsHandler,
 		watcher:          watcher,

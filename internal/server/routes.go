@@ -133,6 +133,11 @@ func (s *Server) setupRoutes() {
 		s.koboHandler.TokenRoutes(r)
 	})
 
+	// KOReader sync routes (no JWT auth — KOSync uses HTTP Basic Auth with MD5 passwords).
+	s.router.Route("/kosync", func(r chi.Router) {
+		s.koreaderHandler.Routes(r)
+	})
+
 	// Frontend: proxy to Vite in dev mode, serve embedded files in production.
 	if s.cfg.DevMode {
 		s.router.Handle("/*", s.viteProxy())

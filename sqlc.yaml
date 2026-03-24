@@ -83,3 +83,12 @@ sql:
         out: "internal/kobo"
         emit_json_tags: true
         emit_empty_slices: true
+  - engine: "sqlite"
+    queries: "internal/koreader/queries.sql"
+    schema: "migrations/"
+    gen:
+      go:
+        package: "koreader"
+        out: "internal/koreader"
+        emit_json_tags: true
+        emit_empty_slices: true
