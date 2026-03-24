@@ -2585,13 +2585,13 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 06, Phase 16
 
 **Changes**:
-- `migrations/012_opds.up.sql` — opds_user table
-- `internal/opds/auth.go` — Basic Auth for OPDS users
-- `internal/opds/handler.go` — Atom XML feed generation
-- Root catalog, library feeds, shelf feeds, series feeds, author feeds
-- OpenSearch description
-- Acquisition links for all available formats
-- OPDS admin settings (enable/disable)
+- [x] `migrations/012_opds.up.sql` — opds_user table
+- [x] `internal/opds/auth.go` — Basic Auth for OPDS users
+- [x] `internal/opds/handler.go` — Atom XML feed generation
+- [x] Root catalog, library feeds, shelf feeds, series feeds, author feeds
+- [x] OpenSearch description
+- [x] Acquisition links for all available formats
+- [x] OPDS admin settings (enable/disable)
 
 **Verification**:
 - OPDS client (e.g., KOReader, Calibre) can connect with Basic Auth

@@ -117,6 +117,11 @@ func (s *Server) setupRoutes() {
 		})
 	})
 
+	// OPDS catalog routes (no JWT auth — OPDS uses its own Basic Auth).
+	s.router.Route("/opds", func(r chi.Router) {
+		s.opdsHandler.Routes(r)
+	})
+
 	// Frontend: proxy to Vite in dev mode, serve embedded files in production.
 	if s.cfg.DevMode {
 		s.router.Handle("/*", s.viteProxy())
