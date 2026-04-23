@@ -21,6 +21,7 @@ import (
 	"github.com/crueber/lexicon/internal/bookdrop"
 	"github.com/crueber/lexicon/internal/contentrestriction"
 	"github.com/crueber/lexicon/internal/dashboard"
+	"github.com/crueber/lexicon/internal/email"
 	"github.com/crueber/lexicon/internal/hardcover"
 	"github.com/crueber/lexicon/internal/kobo"
 	"github.com/crueber/lexicon/internal/koreader"
@@ -62,6 +63,7 @@ type Server struct {
 	hardcoverHandler          *hardcover.Handler
 	appsettingsHandler        *appsettings.Handler
 	bookdropHandler           *bookdrop.Handler
+	emailHandler              *email.Handler
 	hub                       *ws.Hub
 	wsHandler                 *ws.Handler
 	watcher                   *library.Watcher
@@ -254,6 +256,10 @@ func New(cfg Config) (*Server, error) {
 	bookdropHdlr := bookdrop.NewHandler(bookdropSvc, db, logger)
 	bookdropHdlr.WithAuditService(auditSvc)
 
+	emailSvc := email.NewService(db, logger)
+	emailHdlr := email.NewHandler(emailSvc, logger)
+	emailHdlr.WithAuditService(auditSvc)
+
 	s := &Server{
 		cfg:                       cfg,
 		db:                        db,
@@ -278,6 +284,7 @@ func New(cfg Config) (*Server, error) {
 		hardcoverHandler:          hardcoverHdlr,
 		appsettingsHandler:        appsettingsHdlr,
 		bookdropHandler:           bookdropHdlr,
+		emailHandler:              emailHdlr,
 		hub:                       hub,
 		wsHandler:                 wsHandler,
 		watcher:                   watcher,

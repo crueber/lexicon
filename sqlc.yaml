@@ -128,3 +128,12 @@ sql:
         out: "internal/bookdrop"
         emit_json_tags: true
         emit_empty_slices: true
+  - engine: "sqlite"
+    queries: "internal/email/queries.sql"
+    schema: "migrations/"
+    gen:
+      go:
+        package: "email"
+        out: "internal/email"
+        emit_json_tags: true
+        emit_empty_slices: true

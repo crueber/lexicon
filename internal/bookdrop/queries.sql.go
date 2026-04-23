@@ -10,6 +10,17 @@ import (
 	"database/sql"
 )
 
+const countBookdropFilesByPath = `-- name: CountBookdropFilesByPath :one
+SELECT COUNT(*) FROM bookdrop_file WHERE file_path = ?
+`
+
+func (q *Queries) CountBookdropFilesByPath(ctx context.Context, filePath string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countBookdropFilesByPath, filePath)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createBookdropFile = `-- name: CreateBookdropFile :one
 INSERT INTO bookdrop_file (original_filename, file_path, file_size, status, extracted_title, extracted_authors, extracted_cover_path)
 VALUES (?, ?, ?, ?, ?, ?, ?)

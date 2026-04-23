@@ -56,6 +56,9 @@ func (s *Server) setupRoutes() {
 
 			// Similar books recommendation.
 			r.Get("/{id}/similar", s.recommendationHandler.HandleSimilarBooks)
+
+			// Send book to device via email.
+			r.With(auth.RequirePermission("email_send")).Post("/{id}/send", s.emailHandler.HandleSendBook)
 		})
 
 		// Author routes (require auth).
@@ -168,6 +171,19 @@ func (s *Server) setupRoutes() {
 		r.Route("/bookdrop/files", func(r chi.Router) {
 			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
 			s.bookdropHandler.Routes(r)
+		})
+
+		// Email provider routes (require auth + admin).
+		r.Route("/email/providers", func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			r.Use(auth.RequireAdmin())
+			s.emailHandler.ProviderRoutes(r)
+		})
+
+		// Email recipient routes (require auth).
+		r.Route("/email/recipients", func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			s.emailHandler.RecipientRoutes(r)
 		})
 
 		// Admin metadata settings routes (require auth + admin).

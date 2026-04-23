@@ -192,6 +192,27 @@ type DuplicateDismiss struct {
 	CreatedAt   string        `json:"created_at"`
 }
 
+type EmailProvider struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Host        string `json:"host"`
+	Port        int64  `json:"port"`
+	Username    string `json:"username"`
+	Password    string `json:"password"`
+	FromAddress string `json:"from_address"`
+	UseTls      int64  `json:"use_tls"`
+	IsDefault   int64  `json:"is_default"`
+	CreatedAt   string `json:"created_at"`
+}
+
+type EmailRecipient struct {
+	ID           int64          `json:"id"`
+	UserID       int64          `json:"user_id"`
+	Name         sql.NullString `json:"name"`
+	EmailAddress string         `json:"email_address"`
+	CreatedAt    string         `json:"created_at"`
+}
+
 type HardcoverSync struct {
 	ID        int64  `json:"id"`
 	UserID    int64  `json:"user_id"`
