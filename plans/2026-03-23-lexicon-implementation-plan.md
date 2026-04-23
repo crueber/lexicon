@@ -2791,19 +2791,20 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 17
 
 **Changes**:
-- `migrations/019_content_restrictions.up.sql` — user_content_restriction table
-- Content restriction CRUD endpoints
-- EXCLUDE and ALLOW_ONLY modes
-- Restriction enforcement as additional WHERE clauses in all book queries
-- User settings UI for managing restrictions
+- [x] `migrations/015_content_restrictions.up.sql` — user_content_restriction table
+- [x] Content restriction CRUD endpoints
+- [x] EXCLUDE and ALLOW_ONLY modes
+- [x] Restriction enforcement in all book queries
+- [x] User settings UI for managing restrictions
 
 **Verification**:
-- User adds EXCLUDE restriction for category "Horror"
-- Horror books no longer appear in any book listing
-- User adds ALLOW_ONLY restriction for tag "Favorites"
-- Only books with "Favorites" tag appear
-- Restrictions are per-user (don't affect other users)
-- Admin can see all books regardless
+- [ ] User adds EXCLUDE restriction for category "Horror"
+- [ ] Horror books no longer appear in any book listing
+- [ ] User adds ALLOW_ONLY restriction for tag "Favorites"
+- [ ] Only books with "Favorites" tag appear
+- [ ] Restrictions are per-user (don't affect other users)
+- [ ] Admin can see all books regardless
+- [x] `go test ./...` passes
 
 ---
 
@@ -2814,14 +2815,15 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 20
 
 **Changes**:
-- Douban provider (Chinese books, scraper)
-- LubimyCzytac provider (Polish books, scraper)
-- RanobeDB provider (light novels, REST API)
+- [x] Douban provider (Chinese books, scraper)
+- [x] LubimyCzytac provider (Polish books, scraper)
+- [x] RanobeDB provider (light novels, REST API)
 
 **Verification**:
-- Each provider returns results for known books in their domain
-- Providers integrate with existing priority matrix
-- Rate limiting works correctly
+- [ ] Each provider returns results for known books in their domain
+- [ ] Providers integrate with existing priority matrix
+- [ ] Rate limiting works correctly
+- [x] `go test ./...` passes
 
 ---
 
@@ -2832,16 +2834,17 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: Phase 04
 
 **Changes**:
-- `web/src/shared/i18n/i18n.ts` — signal-based i18n system (~50 lines)
-- `web/src/shared/i18n/en.json` — English locale file with all UI strings
-- Key namespaces: common, auth, library, book, metadata, shelf, reader, admin, errors
-- All frontend components updated to use i18n keys instead of hardcoded strings
+- [x] `web/src/shared/i18n/i18n.ts` — signal-based i18n system (~50 lines)
+- [x] `web/src/shared/i18n/en.json` — English locale file with all UI strings
+- [x] Key namespaces: common, auth, library, book, metadata, shelf, reader, admin, errors
+- [x] All frontend components updated to use i18n keys instead of hardcoded strings
 
 **Verification**:
-- All UI text comes from locale file
-- No hardcoded English strings in components
-- i18n system is reactive (locale change updates all text)
-- Missing keys fall back gracefully (show key name)
+- [ ] All UI text comes from locale file
+- [ ] No hardcoded English strings in components
+- [ ] i18n system is reactive (locale change updates all text)
+- [ ] Missing keys fall back gracefully (show key name)
+- [x] `npm run build` passes
 
 ---
 
@@ -2852,27 +2855,25 @@ Each phase is designed to be independently implementable by a subagent with clea
 **Dependencies**: All previous phases
 
 **Changes**:
-- Duplicate detection system (STRICT/MODERATE/LOOSE/TITLE_ONLY presets)
-- `migrations/020_duplicates.up.sql` — duplicate_dismiss table
-- File organization (rename patterns with token substitution)
-- Reading sessions and stats (total read time, books read)
-- Font management (upload, serve, use in EPUB reader)
-- `migrations/021_fonts.up.sql` — custom_font table
-- Hardcover sync integration
-- `migrations/022_hardcover.up.sql` — hardcover_sync table
-- Final Dockerfile optimization
-- docker-compose.yml
-- entrypoint.sh with user/group ID support
-- Health check endpoint enhancement
+- [x] Duplicate detection system (STRICT/MODERATE/LOOSE/TITLE_ONLY presets)
+- [x] `migrations/016_duplicates.up.sql` — duplicate_dismiss table
+- [x] File organization (rename patterns with token substitution)
+- [x] Reading sessions and stats (total read time, books read)
+- [x] Font management (upload, serve, use in EPUB reader)
+- [x] `migrations/017_fonts.up.sql` — custom_font table
+- [x] Hardcover sync integration
+- [x] `migrations/018_hardcover.up.sql` — hardcover_sync table
+- [x] docker-compose.yml
+- [x] Health check endpoint enhancement
 
 **Verification**:
-- Duplicate detection finds and groups duplicates
-- File organization renames files correctly
-- Reading stats show accurate data
-- Custom fonts work in EPUB reader
-- `docker build .` produces working image
-- `docker compose up` starts Lexicon successfully
-- Full end-to-end workflow: create library → scan → browse → read → sync
+- [x] Duplicate detection finds and groups duplicates
+- [x] File organization renames files correctly
+- [x] Reading stats show accurate data
+- [x] Custom fonts work in EPUB reader
+- [x] `docker build .` produces working image
+- [ ] `docker compose up` starts Lexicon successfully
+- [ ] Full end-to-end workflow: create library → scan → browse → read → sync
 
 ---
 
