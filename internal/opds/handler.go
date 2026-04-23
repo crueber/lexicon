@@ -11,11 +11,13 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/crueber/lexicon/internal/audit"
 	"github.com/crueber/lexicon/internal/book"
 	"github.com/crueber/lexicon/internal/contentrestriction"
 	"github.com/crueber/lexicon/internal/library"
@@ -38,6 +40,7 @@ type Handler struct {
 	db                    *sql.DB
 	logger                *slog.Logger
 	contentRestrictionSvc *contentrestriction.Service
+	auditSvc              *audit.Service
 }
 
 // Compile-time interface check.
@@ -56,6 +59,11 @@ func (h *Handler) WithContentRestrictionService(svc *contentrestriction.Service)
 	h.contentRestrictionSvc = svc
 }
 
+// WithAuditService sets the audit service for logging OPDS events.
+func (h *Handler) WithAuditService(svc *audit.Service) {
+	h.auditSvc = svc
+}
+
 // ServeHTTP implements http.Handler (required for compile-time check).
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
@@ -69,9 +77,16 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/", h.handleRoot)
 	r.Get("/books", h.handleAllBooks)
 	r.Get("/libraries", h.handleLibraries)
+	r.Get("/libraries/{id}", h.handleLibraryDetail)
 	r.Get("/libraries/{id}/books", h.handleLibraryBooks)
 	r.Get("/shelves", h.handleShelves)
+	r.Get("/shelves/{id}", h.handleShelfDetail)
 	r.Get("/shelves/{id}/books", h.handleShelfBooks)
+	r.Get("/series", h.handleSeriesList)
+	r.Get("/series/{id}", h.handleSeriesBooks)
+	r.Get("/authors", h.handleAuthorsList)
+	r.Get("/authors/{id}", h.handleAuthorBooks)
+	r.Get("/search", h.handleSearch)
 	r.Get("/books/{id}/files/{fileId}/download", h.handleDownload)
 }
 
@@ -127,6 +142,21 @@ func (h *Handler) basicAuth(next http.Handler) http.Handler {
 			w.WriteHeader(http.StatusForbidden)
 			_, _ = w.Write([]byte(`{"error":"opds access not permitted"}`))
 			return
+		}
+
+		if h.auditSvc != nil {
+			ip := r.RemoteAddr
+			if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+				ip = strings.Split(xff, ",")[0]
+			}
+			userID := u.ID
+			h.auditSvc.Log(r.Context(), audit.LogParams{
+				UserID:       &userID,
+				Username:     u.Username,
+				Action:       audit.ActionOPDSAccess,
+				ResourceType: "opds",
+				IPAddress:    ip,
+			})
 		}
 
 		next.ServeHTTP(w, r)
@@ -745,6 +775,482 @@ func (h *Handler) filterOPDSBookIDs(ctx context.Context, r *http.Request, bookID
 		return bookIDs, nil
 	}
 	return h.contentRestrictionSvc.FilterBookIDs(ctx, userID, isAdmin, bookIDs)
+}
+
+// handleLibraryDetail handles GET /opds/libraries/{id}.
+func (h *Handler) handleLibraryDetail(w http.ResponseWriter, r *http.Request) {
+	libraryID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid library id", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	lq := library.New(h.db)
+
+	lib, err := lq.GetLibraryByID(ctx, libraryID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "library not found", http.StatusNotFound)
+			return
+		}
+		h.logger.Error("opds library detail: get library", "library_id", libraryID, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	feed := Feed{
+		XMLNS:     _nsAtom,
+		XMLNSDC:   _nsDC,
+		XMLNSOPDS: _nsOPDS,
+		ID:        fmt.Sprintf("urn:lexicon:library:%d", libraryID),
+		Title:     lib.Name,
+		Updated:   now,
+		Links: []Link{
+			{Rel: "self", Href: fmt.Sprintf("/opds/libraries/%d", libraryID), Type: typeNavigation},
+			{Rel: "start", Href: "/opds", Type: typeNavigation},
+		},
+		Entries: []Entry{
+			{
+				ID:      fmt.Sprintf("urn:lexicon:library:%d:books", libraryID),
+				Title:   "Books",
+				Updated: now,
+				Links: []Link{
+					{Rel: "subsection", Href: fmt.Sprintf("/opds/libraries/%d/books", libraryID), Type: typeAcquisition},
+				},
+			},
+		},
+	}
+
+	writeXML(w, feed)
+}
+
+// handleShelfDetail handles GET /opds/shelves/{id}.
+func (h *Handler) handleShelfDetail(w http.ResponseWriter, r *http.Request) {
+	shelfID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid shelf id", http.StatusBadRequest)
+		return
+	}
+
+	u, ok := h.userFromRequest(r)
+	if !ok {
+		h.requireAuth(w)
+		return
+	}
+
+	ctx := r.Context()
+	sq := shelf.New(h.db)
+
+	s, err := sq.GetShelfByID(ctx, shelfID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "shelf not found", http.StatusNotFound)
+			return
+		}
+		h.logger.Error("opds shelf detail: get shelf", "shelf_id", shelfID, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	if s.UserID != u.ID && s.IsPublic == 0 {
+		http.Error(w, "access denied", http.StatusForbidden)
+		return
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	feed := Feed{
+		XMLNS:     _nsAtom,
+		XMLNSDC:   _nsDC,
+		XMLNSOPDS: _nsOPDS,
+		ID:        fmt.Sprintf("urn:lexicon:shelf:%d", shelfID),
+		Title:     s.Name,
+		Updated:   now,
+		Links: []Link{
+			{Rel: "self", Href: fmt.Sprintf("/opds/shelves/%d", shelfID), Type: typeNavigation},
+			{Rel: "start", Href: "/opds", Type: typeNavigation},
+		},
+		Entries: []Entry{
+			{
+				ID:      fmt.Sprintf("urn:lexicon:shelf:%d:books", shelfID),
+				Title:   "Books",
+				Updated: now,
+				Links: []Link{
+					{Rel: "subsection", Href: fmt.Sprintf("/opds/shelves/%d/books", shelfID), Type: typeAcquisition},
+				},
+			},
+		},
+	}
+
+	writeXML(w, feed)
+}
+
+// handleSeriesList handles GET /opds/series.
+func (h *Handler) handleSeriesList(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	bq := book.New(h.db)
+
+	series, err := bq.ListSeries(ctx)
+	if err != nil {
+		h.logger.Error("opds series list", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	entries := make([]Entry, 0, len(series))
+	for _, s := range series {
+		entries = append(entries, Entry{
+			ID:      fmt.Sprintf("urn:lexicon:series:%d", s.ID),
+			Title:   s.Name,
+			Updated: now,
+			Links: []Link{
+				{Rel: "subsection", Href: fmt.Sprintf("/opds/series/%d", s.ID), Type: typeAcquisition},
+			},
+		})
+	}
+
+	feed := Feed{
+		XMLNS:     _nsAtom,
+		XMLNSDC:   _nsDC,
+		XMLNSOPDS: _nsOPDS,
+		ID:        "urn:lexicon:series",
+		Title:     "Series",
+		Updated:   now,
+		Links: []Link{
+			{Rel: "self", Href: "/opds/series", Type: typeNavigation},
+			{Rel: "start", Href: "/opds", Type: typeNavigation},
+		},
+		Entries: entries,
+	}
+
+	writeXML(w, feed)
+}
+
+// handleSeriesBooks handles GET /opds/series/{id}/books.
+func (h *Handler) handleSeriesBooks(w http.ResponseWriter, r *http.Request) {
+	seriesID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid series id", http.StatusBadRequest)
+		return
+	}
+
+	page := parsePage(r)
+	offset := int64((page - 1) * _pageSize)
+
+	ctx := r.Context()
+	bq := book.New(h.db)
+
+	series, err := bq.GetSeriesByID(ctx, seriesID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "series not found", http.StatusNotFound)
+			return
+		}
+		h.logger.Error("opds series books: get series", "series_id", seriesID, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	books, err := bq.ListBooksBySeries(ctx, seriesID)
+	if err != nil {
+		h.logger.Error("opds series books: list", "series_id", seriesID, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	// Apply content restrictions.
+	if len(books) > 0 {
+		bookIDs := make([]int64, len(books))
+		for i, b := range books {
+			bookIDs[i] = b.ID
+		}
+		filteredIDs, filterErr := h.filterOPDSBookIDs(ctx, r, bookIDs)
+		if filterErr == nil {
+			idSet := make(map[int64]struct{}, len(filteredIDs))
+			for _, id := range filteredIDs {
+				idSet[id] = struct{}{}
+			}
+			var filtered []book.ListBooksBySeriesRow
+			for _, b := range books {
+				if _, ok := idSet[b.ID]; ok {
+					filtered = append(filtered, b)
+				}
+			}
+			books = filtered
+		}
+	}
+
+	// Apply manual pagination.
+	start := int(offset)
+	end := start + _pageSize
+	if start > len(books) {
+		start = len(books)
+	}
+	if end > len(books) {
+		end = len(books)
+	}
+	paginated := books[start:end]
+
+	entries := make([]Entry, 0, len(paginated))
+	for _, b := range paginated {
+		entry, err := h.buildBookEntry(ctx, b.ID, b.Title, b.CoverPath, b.AddedDate)
+		if err != nil {
+			h.logger.Error("opds series books: build entry", "book_id", b.ID, "error", err)
+			continue
+		}
+		entries = append(entries, entry)
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	selfHref := fmt.Sprintf("/opds/series/%d", seriesID)
+	feed := Feed{
+		XMLNS:     _nsAtom,
+		XMLNSDC:   _nsDC,
+		XMLNSOPDS: _nsOPDS,
+		ID:        fmt.Sprintf("urn:lexicon:series:%d:books", seriesID),
+		Title:     series.Name,
+		Updated:   now,
+		Links:     paginationLinks(selfHref, page, len(entries) == _pageSize),
+		Entries:   entries,
+	}
+
+	writeXML(w, feed)
+}
+
+// handleAuthorsList handles GET /opds/authors.
+func (h *Handler) handleAuthorsList(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	bq := book.New(h.db)
+
+	authors, err := bq.ListAuthors(ctx)
+	if err != nil {
+		h.logger.Error("opds authors list", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	entries := make([]Entry, 0, len(authors))
+	for _, a := range authors {
+		entries = append(entries, Entry{
+			ID:      fmt.Sprintf("urn:lexicon:author:%d", a.ID),
+			Title:   a.Name,
+			Updated: now,
+			Links: []Link{
+				{Rel: "subsection", Href: fmt.Sprintf("/opds/authors/%d", a.ID), Type: typeAcquisition},
+			},
+		})
+	}
+
+	feed := Feed{
+		XMLNS:     _nsAtom,
+		XMLNSDC:   _nsDC,
+		XMLNSOPDS: _nsOPDS,
+		ID:        "urn:lexicon:authors",
+		Title:     "Authors",
+		Updated:   now,
+		Links: []Link{
+			{Rel: "self", Href: "/opds/authors", Type: typeNavigation},
+			{Rel: "start", Href: "/opds", Type: typeNavigation},
+		},
+		Entries: entries,
+	}
+
+	writeXML(w, feed)
+}
+
+// handleAuthorBooks handles GET /opds/authors/{id}/books.
+func (h *Handler) handleAuthorBooks(w http.ResponseWriter, r *http.Request) {
+	authorID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid author id", http.StatusBadRequest)
+		return
+	}
+
+	page := parsePage(r)
+	offset := int64((page - 1) * _pageSize)
+
+	ctx := r.Context()
+	bq := book.New(h.db)
+
+	author, err := bq.GetAuthorByID(ctx, authorID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "author not found", http.StatusNotFound)
+			return
+		}
+		h.logger.Error("opds author books: get author", "author_id", authorID, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	books, err := bq.ListBooksByAuthor(ctx, authorID)
+	if err != nil {
+		h.logger.Error("opds author books: list", "author_id", authorID, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	// Apply content restrictions.
+	if len(books) > 0 {
+		bookIDs := make([]int64, len(books))
+		for i, b := range books {
+			bookIDs[i] = b.ID
+		}
+		filteredIDs, filterErr := h.filterOPDSBookIDs(ctx, r, bookIDs)
+		if filterErr == nil {
+			idSet := make(map[int64]struct{}, len(filteredIDs))
+			for _, id := range filteredIDs {
+				idSet[id] = struct{}{}
+			}
+			var filtered []book.ListBooksByAuthorRow
+			for _, b := range books {
+				if _, ok := idSet[b.ID]; ok {
+					filtered = append(filtered, b)
+				}
+			}
+			books = filtered
+		}
+	}
+
+	// Apply manual pagination.
+	start := int(offset)
+	end := start + _pageSize
+	if start > len(books) {
+		start = len(books)
+	}
+	if end > len(books) {
+		end = len(books)
+	}
+	paginated := books[start:end]
+
+	entries := make([]Entry, 0, len(paginated))
+	for _, b := range paginated {
+		entry, err := h.buildBookEntry(ctx, b.ID, b.Title, b.CoverPath, b.AddedDate)
+		if err != nil {
+			h.logger.Error("opds author books: build entry", "book_id", b.ID, "error", err)
+			continue
+		}
+		entries = append(entries, entry)
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	selfHref := fmt.Sprintf("/opds/authors/%d", authorID)
+	feed := Feed{
+		XMLNS:     _nsAtom,
+		XMLNSDC:   _nsDC,
+		XMLNSOPDS: _nsOPDS,
+		ID:        fmt.Sprintf("urn:lexicon:author:%d:books", authorID),
+		Title:     author.Name,
+		Updated:   now,
+		Links:     paginationLinks(selfHref, page, len(entries) == _pageSize),
+		Entries:   entries,
+	}
+
+	writeXML(w, feed)
+}
+
+// handleSearch handles GET /opds/search?q={query}.
+// Returns OpenSearch description when no query is provided.
+func (h *Handler) handleSearch(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		// Return OpenSearch description.
+		opensearch := `<?xml version="1.0" encoding="UTF-8"?>
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
+  <ShortName>Lexicon Search</ShortName>
+  <Description>Search books in Lexicon</Description>
+  <Url type="application/atom+xml" template="/opds/search?q={searchTerms}"/>
+</OpenSearchDescription>`
+		w.Header().Set("Content-Type", "application/opensearchdescription+xml")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(opensearch))
+		return
+	}
+
+	page := parsePage(r)
+	offset := int64((page - 1) * _pageSize)
+
+	ctx := r.Context()
+
+	// Search across book titles using a LIKE query.
+	searchPattern := "%" + query + "%"
+	rows, err := h.db.QueryContext(ctx, `SELECT b.id, b.library_id, b.book_type, b.added_date, bm.title, bm.cover_path FROM book b LEFT JOIN book_metadata bm ON b.id = bm.book_id WHERE bm.title LIKE ? OR b.folder_path LIKE ? ORDER BY b.added_date DESC LIMIT ? OFFSET ?`, searchPattern, searchPattern, _pageSize, offset)
+	if err != nil {
+		h.logger.Error("opds search", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	type searchRow struct {
+		id        int64
+		libraryID int64
+		bookType  string
+		addedDate sql.NullString
+		title     sql.NullString
+		coverPath sql.NullString
+	}
+
+	var results []searchRow
+	for rows.Next() {
+		var s searchRow
+		if err := rows.Scan(&s.id, &s.libraryID, &s.bookType, &s.addedDate, &s.title, &s.coverPath); err != nil {
+			h.logger.Error("opds search scan", "error", err)
+			continue
+		}
+		results = append(results, s)
+	}
+	_ = rows.Close()
+
+	// Apply content restrictions.
+	if len(results) > 0 {
+		bookIDs := make([]int64, len(results))
+		for i, b := range results {
+			bookIDs[i] = b.id
+		}
+		filteredIDs, filterErr := h.filterOPDSBookIDs(ctx, r, bookIDs)
+		if filterErr == nil {
+			idSet := make(map[int64]struct{}, len(filteredIDs))
+			for _, id := range filteredIDs {
+				idSet[id] = struct{}{}
+			}
+			var filtered []searchRow
+			for _, b := range results {
+				if _, ok := idSet[b.id]; ok {
+					filtered = append(filtered, b)
+				}
+			}
+			results = filtered
+		}
+	}
+
+	entries := make([]Entry, 0, len(results))
+	for _, b := range results {
+		entry, err := h.buildBookEntry(ctx, b.id, b.title, b.coverPath, b.addedDate)
+		if err != nil {
+			h.logger.Error("opds search: build entry", "book_id", b.id, "error", err)
+			continue
+		}
+		entries = append(entries, entry)
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	selfHref := "/opds/search"
+	feed := Feed{
+		XMLNS:     _nsAtom,
+		XMLNSDC:   _nsDC,
+		XMLNSOPDS: _nsOPDS,
+		ID:        "urn:lexicon:search",
+		Title:     fmt.Sprintf("Search: %s", query),
+		Updated:   now,
+		Links:     paginationLinks(selfHref, page, len(entries) == _pageSize),
+		Entries:   entries,
+	}
+
+	writeXML(w, feed)
 }
 
 // writeXML writes an XML response with the OPDS content type.

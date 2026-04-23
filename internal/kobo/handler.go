@@ -24,6 +24,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/crueber/lexicon/internal/audit"
 	"github.com/crueber/lexicon/internal/book"
 	"github.com/crueber/lexicon/internal/contentrestriction"
 	"github.com/crueber/lexicon/internal/user"
@@ -36,6 +37,7 @@ type Handler struct {
 	logger                *slog.Logger
 	principalExtractor    func(*http.Request) (int64, bool)
 	contentRestrictionSvc *contentrestriction.Service
+	auditSvc              *audit.Service
 }
 
 // Compile-time interface check.
@@ -62,6 +64,11 @@ func (h *Handler) WithContentRestrictionService(svc *contentrestriction.Service)
 	h.contentRestrictionSvc = svc
 }
 
+// WithAuditService sets the audit service for logging Kobo events.
+func (h *Handler) WithAuditService(svc *audit.Service) {
+	h.auditSvc = svc
+}
+
 // ServeHTTP implements http.Handler (required for compile-time check).
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
@@ -76,6 +83,8 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/v1/library/sync", h.handleLibrarySync)
 	r.Get("/v1/library/{contentId}/metadata", h.handleBookMetadata)
 	r.Get("/v1/library/{contentId}/download", h.handleDownload)
+	r.Put("/v1/library/{contentId}/state", h.handlePutReadingState)
+	r.Delete("/v1/library/{contentId}", h.handleDeleteLibraryItem)
 	r.Post("/v1/library/sync/reading-state", h.handleSyncReadingState)
 	r.Get("/v1/user/profile", h.handleUserProfile)
 	r.Get("/v1/user/wishlist", h.handleWishlist)
@@ -87,6 +96,8 @@ func (h *Handler) Routes(r chi.Router) {
 // RequireAuth must already be applied by the caller.
 func (h *Handler) TokenRoutes(r chi.Router) {
 	r.Post("/token", h.handleGenerateToken)
+	r.Get("/settings", h.handleGetSettings)
+	r.Put("/settings", h.handlePutSettings)
 }
 
 // koboAuth is middleware that validates the X-Kobo-UserKey header against
@@ -513,6 +524,23 @@ func (h *Handler) handleLibrarySync(w http.ResponseWriter, r *http.Request) {
 		entries = []bookEntitlement{}
 	}
 
+	if entries == nil {
+		entries = []bookEntitlement{}
+	}
+
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			UserID:       &userID,
+			Action:       audit.ActionKoboSync,
+			ResourceType: "kobo",
+			IPAddress:    ip,
+		})
+	}
+
 	w.Header().Set("x-kobo-sync", "continue")
 	w.Header().Set("x-kobo-synctoken", "")
 	writeJSON(w, http.StatusOK, entries)
@@ -902,6 +930,202 @@ func (h *Handler) baseURL(r *http.Request) string {
 		scheme = "https"
 	}
 	return fmt.Sprintf("%s://%s", scheme, r.Host)
+}
+
+// handleGetSettings handles GET /api/kobo/settings.
+func (h *Handler) handleGetSettings(w http.ResponseWriter, r *http.Request) {
+	if h.principalExtractor == nil {
+		writeError(w, http.StatusInternalServerError, "principal extractor not configured")
+		return
+	}
+
+	userID, ok := h.principalExtractor(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	uq := user.New(h.db)
+	settings := map[string]string{}
+
+	// Read known kobo settings keys.
+	for _, key := range []string{"kobo_store_url", "kobo_sync_interval"} {
+		val, err := uq.GetAppSetting(r.Context(), key)
+		if err == nil && val.Valid {
+			settings[key] = val.String
+		}
+	}
+
+	// Also include the user's token if they have one.
+	tokenKey := fmt.Sprintf("kobo_token_%d", userID)
+	token, err := uq.GetAppSetting(r.Context(), tokenKey)
+	if err == nil && token.Valid {
+		settings["token"] = token.String
+	}
+
+	writeJSON(w, http.StatusOK, settings)
+}
+
+// handlePutSettings handles PUT /api/kobo/settings.
+func (h *Handler) handlePutSettings(w http.ResponseWriter, r *http.Request) {
+	if h.principalExtractor == nil {
+		writeError(w, http.StatusInternalServerError, "principal extractor not configured")
+		return
+	}
+
+	userID, ok := h.principalExtractor(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	var req map[string]string
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	uq := user.New(h.db)
+	ctx := r.Context()
+	for key, value := range req {
+		if err := uq.UpsertAppSetting(ctx, user.UpsertAppSettingParams{
+			Key:   key,
+			Value: sql.NullString{String: value, Valid: true},
+		}); err != nil {
+			h.logger.Error("upsert kobo setting", "key", key, "error", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+	}
+
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			UserID:       &userID,
+			Action:       audit.ActionAdminAction,
+			ResourceType: "kobo_settings",
+			IPAddress:    ip,
+		})
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handlePutReadingState handles PUT /kobo/v1/library/{contentId}/state.
+func (h *Handler) handlePutReadingState(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	contentID := chi.URLParam(r, "contentId")
+	fileID, err := strconv.ParseInt(contentID, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid content id")
+		return
+	}
+
+	var state readingStateSyncRequest
+	if err := json.NewDecoder(r.Body).Decode(&state); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	ctx := r.Context()
+	kq := New(h.db)
+	bq := book.New(h.db)
+
+	for _, rs := range state.ReadingStates {
+		fid, err := strconv.ParseInt(rs.EntitlementID, 10, 64)
+		if err != nil {
+			h.logger.Warn("invalid entitlement id in reading state", "id", rs.EntitlementID)
+			continue
+		}
+
+		bookFile, err := bq.GetBookFileByID(ctx, fid)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				h.logger.Warn("book file not found for reading state", "file_id", fid)
+				continue
+			}
+			h.logger.Error("get book file for reading state", "file_id", fid, "error", err)
+			continue
+		}
+
+		// Only allow updating the file that matches the URL contentId.
+		if bookFile.ID != fileID {
+			continue
+		}
+
+		cfi := ""
+		if rs.CurrentBookmark.Location != nil {
+			cfi = rs.CurrentBookmark.Location.Value
+		}
+
+		lastModified := rs.LastModified
+		if lastModified == "" {
+			lastModified = time.Now().UTC().Format(time.RFC3339)
+		}
+
+		if err := kq.UpsertKoboReadingState(ctx, UpsertKoboReadingStateParams{
+			UserID:       userID,
+			BookFileID:   bookFile.ID,
+			ContentID:    rs.EntitlementID,
+			Status:       sql.NullString{String: rs.StatusInfo.Status, Valid: rs.StatusInfo.Status != ""},
+			PercentRead:  sql.NullFloat64{Float64: rs.CurrentBookmark.ProgressPercent, Valid: true},
+			CurrentCfi:   sql.NullString{String: cfi, Valid: cfi != ""},
+			LastModified: sql.NullString{String: lastModified, Valid: true},
+		}); err != nil {
+			h.logger.Error("upsert kobo reading state", "file_id", fid, "error", err)
+			continue
+		}
+
+		if rs.CurrentBookmark.ProgressPercent > 0 || cfi != "" {
+			progressValue := fmt.Sprintf("%.4f", rs.CurrentBookmark.ProgressPercent)
+			if cfi != "" {
+				progressValue = cfi
+			}
+			if err := bq.UpsertProgress(ctx, book.UpsertProgressParams{
+				UserID:       userID,
+				BookFileID:   bookFile.ID,
+				Progress:     sql.NullString{String: progressValue, Valid: true},
+				ProgressType: sql.NullString{String: "kobo", Valid: true},
+			}); err != nil {
+				h.logger.Error("upsert progress from kobo", "file_id", fid, "error", err)
+			}
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"ReadingStates": []any{}})
+}
+
+// handleDeleteLibraryItem handles DELETE /kobo/v1/library/{contentId}.
+func (h *Handler) handleDeleteLibraryItem(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	contentID := chi.URLParam(r, "contentId")
+
+	ctx := r.Context()
+	kq := New(h.db)
+
+	if err := kq.DeleteKoboReadingState(ctx, DeleteKoboReadingStateParams{
+		UserID:    userID,
+		ContentID: contentID,
+	}); err != nil {
+		h.logger.Error("delete kobo reading state", "content_id", contentID, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // writeJSON writes a JSON response with the given status code.

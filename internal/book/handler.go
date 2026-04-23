@@ -61,10 +61,36 @@ func (h *Handler) WithContentRestrictionService(svc *contentrestriction.Service)
 func (h *Handler) Routes(r chi.Router) {
 	r.Get("/", h.handleList)
 	r.Get("/duplicates", h.handleListDuplicates)
+	r.Post("/duplicates/dismiss", h.handleDismissDuplicate)
+	r.Post("/merge", h.handleMergeBooks)
 	r.Get("/{id}", h.handleGet)
 	r.Delete("/{id}", h.handleDelete)
 	r.Get("/{id}/files", h.handleListFiles)
 	r.Get("/{id}/shelves", h.handleListShelves)
+}
+
+// AuthorRoutes registers author routes on the given router.
+// RequireAuth must already be applied by the caller.
+func (h *Handler) AuthorRoutes(r chi.Router) {
+	r.Get("/", h.handleListAuthors)
+	r.Get("/{id}", h.handleGetAuthor)
+	r.Get("/{id}/books", h.handleListBooksByAuthor)
+}
+
+// SeriesRoutes registers series routes on the given router.
+// RequireAuth must already be applied by the caller.
+func (h *Handler) SeriesRoutes(r chi.Router) {
+	r.Get("/", h.handleListSeries)
+	r.Get("/{id}", h.handleGetSeries)
+	r.Get("/{id}/books", h.handleListBooksBySeries)
+}
+
+// TaxonomyRoutes registers taxonomy routes on the given router.
+// RequireAuth must already be applied by the caller.
+func (h *Handler) TaxonomyRoutes(r chi.Router) {
+	r.Get("/categories", h.handleListCategories)
+	r.Get("/tags", h.handleListTags)
+	r.Get("/moods", h.handleListMoods)
 }
 
 // handleListShelves handles GET /api/books/{id}/shelves.
@@ -759,6 +785,568 @@ func (h *Handler) handleListFiles(w http.ResponseWriter, r *http.Request) {
 		resp = append(resp, fr)
 	}
 
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// dismissDuplicateRequest is the JSON body for POST /api/books/duplicates/dismiss.
+type dismissDuplicateRequest struct {
+	BookIDA int64 `json:"bookIdA"`
+	BookIDB int64 `json:"bookIdB"`
+}
+
+// handleDismissDuplicate handles POST /api/books/duplicates/dismiss.
+func (h *Handler) handleDismissDuplicate(w http.ResponseWriter, r *http.Request) {
+	principal := auth.PrincipalFromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	if !principal.IsAdmin() {
+		writeError(w, http.StatusForbidden, "admin access required")
+		return
+	}
+
+	var req dismissDuplicateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	q := New(h.db)
+	if err := q.DismissDuplicate(r.Context(), DismissDuplicateParams{
+		BookIDA: req.BookIDA,
+		BookIDB: req.BookIDB,
+		DismissedBy: sql.NullInt64{Int64: principal.UserID, Valid: true},
+	}); err != nil {
+		h.logger.Error("dismiss duplicate", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// mergeBooksRequest is the JSON body for POST /api/books/merge.
+type mergeBooksRequest struct {
+	SourceID int64 `json:"sourceId"`
+	TargetID int64 `json:"targetId"`
+}
+
+// handleMergeBooks handles POST /api/books/merge (admin only).
+func (h *Handler) handleMergeBooks(w http.ResponseWriter, r *http.Request) {
+	principal := auth.PrincipalFromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	if !principal.IsAdmin() {
+		writeError(w, http.StatusForbidden, "admin access required")
+		return
+	}
+
+	var req mergeBooksRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.SourceID == 0 || req.TargetID == 0 || req.SourceID == req.TargetID {
+		writeError(w, http.StatusBadRequest, "sourceId and targetId must be different and non-zero")
+		return
+	}
+
+	ctx := r.Context()
+
+	// Verify both books exist.
+	q := New(h.db)
+	if _, err := q.GetBookByID(ctx, req.SourceID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "source book not found")
+			return
+		}
+		h.logger.Error("get source book", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if _, err := q.GetBookByID(ctx, req.TargetID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "target book not found")
+			return
+		}
+		h.logger.Error("get target book", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	tx, err := h.db.BeginTx(ctx, nil)
+	if err != nil {
+		h.logger.Error("begin merge transaction", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	defer tx.Rollback()
+
+	tq := New(tx)
+
+	// Move book files.
+	if _, err := tx.ExecContext(ctx, "UPDATE book_file SET book_id = ? WHERE book_id = ?", req.TargetID, req.SourceID); err != nil {
+		h.logger.Error("merge book files", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	// Move book authors.
+	if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO book_author (book_id, author_id, sort_order) SELECT ?, author_id, sort_order FROM book_author WHERE book_id = ?", req.TargetID, req.SourceID); err != nil {
+		h.logger.Error("merge book authors", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM book_author WHERE book_id = ?", req.SourceID); err != nil {
+		h.logger.Error("delete source book authors", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	// Move book series.
+	if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO book_series (book_id, series_id, series_number) SELECT ?, series_id, series_number FROM book_series WHERE book_id = ?", req.TargetID, req.SourceID); err != nil {
+		h.logger.Error("merge book series", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM book_series WHERE book_id = ?", req.SourceID); err != nil {
+		h.logger.Error("delete source book series", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	// Move book categories.
+	if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO book_category (book_id, category_id) SELECT ?, category_id FROM book_category WHERE book_id = ?", req.TargetID, req.SourceID); err != nil {
+		h.logger.Error("merge book categories", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM book_category WHERE book_id = ?", req.SourceID); err != nil {
+		h.logger.Error("delete source book categories", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	// Move book tags.
+	if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO book_tag (book_id, tag_id) SELECT ?, tag_id FROM book_tag WHERE book_id = ?", req.TargetID, req.SourceID); err != nil {
+		h.logger.Error("merge book tags", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM book_tag WHERE book_id = ?", req.SourceID); err != nil {
+		h.logger.Error("delete source book tags", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	// Move book moods.
+	if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO book_mood (book_id, mood_id) SELECT ?, mood_id FROM book_mood WHERE book_id = ?", req.TargetID, req.SourceID); err != nil {
+		h.logger.Error("merge book moods", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM book_mood WHERE book_id = ?", req.SourceID); err != nil {
+		h.logger.Error("delete source book moods", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	// Move annotations.
+	if _, err := tx.ExecContext(ctx, "UPDATE annotation SET book_id = ? WHERE book_id = ?", req.TargetID, req.SourceID); err != nil {
+		h.logger.Error("merge annotations", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	// Move reading sessions.
+	if _, err := tx.ExecContext(ctx, "UPDATE reading_sessions SET book_id = ? WHERE book_id = ?", req.TargetID, req.SourceID); err != nil {
+		h.logger.Error("merge reading sessions", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	// Delete source book metadata.
+	if _, err := tx.ExecContext(ctx, "DELETE FROM book_metadata WHERE book_id = ?", req.SourceID); err != nil {
+		h.logger.Error("delete source book metadata", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	// Delete source book.
+	if err := tq.DeleteBook(ctx, req.SourceID); err != nil {
+		h.logger.Error("delete source book", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		h.logger.Error("commit merge transaction", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			UserID:       &principal.UserID,
+			Action:       audit.ActionBookDeleted,
+			ResourceType: "book",
+			ResourceID:   &req.SourceID,
+			Details: map[string]any{
+				"merged_into": req.TargetID,
+			},
+			IPAddress: ip,
+		})
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// --- Authors ---
+
+// AuthorListResponse is the JSON representation of an author with book count.
+type AuthorListResponse struct {
+	ID         int64  `json:"id"`
+	Name       string `json:"name"`
+	BookCount  int64  `json:"bookCount"`
+}
+
+// handleListAuthors handles GET /api/authors.
+func (h *Handler) handleListAuthors(w http.ResponseWriter, r *http.Request) {
+	if auth.PrincipalFromContext(r.Context()) == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	q := New(h.db)
+	authors, err := q.ListAuthors(r.Context())
+	if err != nil {
+		h.logger.Error("list authors", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	resp := make([]AuthorListResponse, 0, len(authors))
+	for _, a := range authors {
+		resp = append(resp, AuthorListResponse{
+			ID:        a.ID,
+			Name:      a.Name,
+			BookCount: a.BookCount,
+		})
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleGetAuthor handles GET /api/authors/{id}.
+func (h *Handler) handleGetAuthor(w http.ResponseWriter, r *http.Request) {
+	if auth.PrincipalFromContext(r.Context()) == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid author id")
+		return
+	}
+
+	q := New(h.db)
+	author, err := q.GetAuthorByID(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "author not found")
+			return
+		}
+		h.logger.Error("get author", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, AuthorResponse{ID: author.ID, Name: author.Name})
+}
+
+// handleListBooksByAuthor handles GET /api/authors/{id}/books.
+func (h *Handler) handleListBooksByAuthor(w http.ResponseWriter, r *http.Request) {
+	principal := auth.PrincipalFromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	idStr := chi.URLParam(r, "id")
+	authorID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid author id")
+		return
+	}
+
+	q := New(h.db)
+	ctx := r.Context()
+	rows, err := q.ListBooksByAuthor(ctx, authorID)
+	if err != nil {
+		h.logger.Error("list books by author", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	books := make([]BookResponse, 0, len(rows))
+	for _, row := range rows {
+		authors, authErr := q.ListBookAuthors(ctx, row.ID)
+		if authErr != nil {
+			h.logger.Warn("list book authors", "book_id", row.ID, "error", authErr)
+		}
+		authorNames := make([]string, len(authors))
+		for i, a := range authors {
+			authorNames[i] = a.Name
+		}
+
+		br := BookResponse{
+			ID:        row.ID,
+			LibraryID: row.LibraryID,
+			BookType:  row.BookType,
+			Authors:   authorNames,
+		}
+		if row.Title.Valid {
+			br.Title = &row.Title.String
+		}
+		if row.CoverPath.Valid {
+			br.CoverPath = &row.CoverPath.String
+		}
+		if row.AddedDate.Valid {
+			br.AddedDate = &row.AddedDate.String
+		}
+		books = append(books, br)
+	}
+
+	writeJSON(w, http.StatusOK, books)
+}
+
+// --- Series ---
+
+// SeriesListResponse is the JSON representation of a series with book count.
+type SeriesListResponse struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	BookCount int64  `json:"bookCount"`
+}
+
+// handleListSeries handles GET /api/series.
+func (h *Handler) handleListSeries(w http.ResponseWriter, r *http.Request) {
+	if auth.PrincipalFromContext(r.Context()) == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	q := New(h.db)
+	series, err := q.ListSeries(r.Context())
+	if err != nil {
+		h.logger.Error("list series", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	resp := make([]SeriesListResponse, 0, len(series))
+	for _, s := range series {
+		resp = append(resp, SeriesListResponse{
+			ID:        s.ID,
+			Name:      s.Name,
+			BookCount: s.BookCount,
+		})
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleGetSeries handles GET /api/series/{id}.
+func (h *Handler) handleGetSeries(w http.ResponseWriter, r *http.Request) {
+	if auth.PrincipalFromContext(r.Context()) == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid series id")
+		return
+	}
+
+	q := New(h.db)
+	s, err := q.GetSeriesByID(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "series not found")
+			return
+		}
+		h.logger.Error("get series", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SeriesResponse{ID: s.ID, Name: s.Name})
+}
+
+// handleListBooksBySeries handles GET /api/series/{id}/books.
+func (h *Handler) handleListBooksBySeries(w http.ResponseWriter, r *http.Request) {
+	principal := auth.PrincipalFromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	idStr := chi.URLParam(r, "id")
+	seriesID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid series id")
+		return
+	}
+
+	q := New(h.db)
+	ctx := r.Context()
+	rows, err := q.ListBooksBySeries(ctx, seriesID)
+	if err != nil {
+		h.logger.Error("list books by series", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	books := make([]BookResponse, 0, len(rows))
+	for _, row := range rows {
+		authors, authErr := q.ListBookAuthors(ctx, row.ID)
+		if authErr != nil {
+			h.logger.Warn("list book authors", "book_id", row.ID, "error", authErr)
+		}
+		authorNames := make([]string, len(authors))
+		for i, a := range authors {
+			authorNames[i] = a.Name
+		}
+
+		br := BookResponse{
+			ID:        row.ID,
+			LibraryID: row.LibraryID,
+			BookType:  row.BookType,
+			Authors:   authorNames,
+		}
+		if row.Title.Valid {
+			br.Title = &row.Title.String
+		}
+		if row.CoverPath.Valid {
+			br.CoverPath = &row.CoverPath.String
+		}
+		if row.AddedDate.Valid {
+			br.AddedDate = &row.AddedDate.String
+		}
+		books = append(books, br)
+	}
+
+	writeJSON(w, http.StatusOK, books)
+}
+
+// --- Taxonomy ---
+
+// CategoryListResponse is the JSON representation of a category with book count.
+type CategoryListResponse struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	BookCount int64  `json:"bookCount"`
+}
+
+// TagListResponse is the JSON representation of a tag with book count.
+type TagListResponse struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	BookCount int64  `json:"bookCount"`
+}
+
+// MoodListResponse is the JSON representation of a mood with book count.
+type MoodListResponse struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	BookCount int64  `json:"bookCount"`
+}
+
+// handleListCategories handles GET /api/categories.
+func (h *Handler) handleListCategories(w http.ResponseWriter, r *http.Request) {
+	if auth.PrincipalFromContext(r.Context()) == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	q := New(h.db)
+	categories, err := q.ListCategories(r.Context())
+	if err != nil {
+		h.logger.Error("list categories", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	resp := make([]CategoryListResponse, 0, len(categories))
+	for _, c := range categories {
+		resp = append(resp, CategoryListResponse{
+			ID:        c.ID,
+			Name:      c.Name,
+			BookCount: c.BookCount,
+		})
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleListTags handles GET /api/tags.
+func (h *Handler) handleListTags(w http.ResponseWriter, r *http.Request) {
+	if auth.PrincipalFromContext(r.Context()) == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	q := New(h.db)
+	tags, err := q.ListTags(r.Context())
+	if err != nil {
+		h.logger.Error("list tags", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	resp := make([]TagListResponse, 0, len(tags))
+	for _, t := range tags {
+		resp = append(resp, TagListResponse{
+			ID:        t.ID,
+			Name:      t.Name,
+			BookCount: t.BookCount,
+		})
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleListMoods handles GET /api/moods.
+func (h *Handler) handleListMoods(w http.ResponseWriter, r *http.Request) {
+	if auth.PrincipalFromContext(r.Context()) == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	q := New(h.db)
+	moods, err := q.ListMoods(r.Context())
+	if err != nil {
+		h.logger.Error("list moods", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	resp := make([]MoodListResponse, 0, len(moods))
+	for _, m := range moods {
+		resp = append(resp, MoodListResponse{
+			ID:        m.ID,
+			Name:      m.Name,
+			BookCount: m.BookCount,
+		})
+	}
 	writeJSON(w, http.StatusOK, resp)
 }
 

@@ -10,6 +10,20 @@ import (
 	"database/sql"
 )
 
+const deleteKoboReadingState = `-- name: DeleteKoboReadingState :exec
+DELETE FROM kobo_reading_state WHERE user_id = ? AND content_id = ?
+`
+
+type DeleteKoboReadingStateParams struct {
+	UserID    int64  `json:"user_id"`
+	ContentID string `json:"content_id"`
+}
+
+func (q *Queries) DeleteKoboReadingState(ctx context.Context, arg DeleteKoboReadingStateParams) error {
+	_, err := q.db.ExecContext(ctx, deleteKoboReadingState, arg.UserID, arg.ContentID)
+	return err
+}
+
 const getKoboDeviceByDeviceID = `-- name: GetKoboDeviceByDeviceID :one
 SELECT id, user_id, device_id, device_name, model, firmware, last_sync_at, created_at FROM kobo_device WHERE device_id = ? LIMIT 1
 `

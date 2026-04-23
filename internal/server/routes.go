@@ -50,10 +50,30 @@ func (s *Server) setupRoutes() {
 			// Cover serving routes nested under /books/{id}/cover.
 			r.Route("/{id}/cover", func(r chi.Router) {
 				s.storageHandler.Routes(r)
+				r.Put("/", s.storageHandler.HandleUploadCover)
+				r.Delete("/", s.storageHandler.HandleDeleteCover)
 			})
 
 			// Similar books recommendation.
 			r.Get("/{id}/similar", s.recommendationHandler.HandleSimilarBooks)
+		})
+
+		// Author routes (require auth).
+		r.Route("/authors", func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			s.bookHandler.AuthorRoutes(r)
+		})
+
+		// Series routes (require auth).
+		r.Route("/series", func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			s.bookHandler.SeriesRoutes(r)
+		})
+
+		// Taxonomy routes (require auth).
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			s.bookHandler.TaxonomyRoutes(r)
 		})
 
 		// Shelf routes (require auth).
@@ -85,6 +105,12 @@ func (s *Server) setupRoutes() {
 		r.Route("/users", func(r chi.Router) {
 			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
 			s.userHandler.SelfRoutes(r)
+		})
+
+		// Reading stats (require auth).
+		r.Route("/users/me/reading-stats", func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			r.Get("/", s.readerHandler.HandleReadingStats)
 		})
 
 		// Content restriction routes (require auth).
@@ -142,6 +168,8 @@ func (s *Server) setupRoutes() {
 		r.Route("/admin/settings", func(r chi.Router) {
 			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
 			r.Use(auth.RequireAdmin())
+			r.Get("/", s.appsettingsHandler.HandleGetSettings)
+			r.Put("/", s.appsettingsHandler.HandleSaveSettings)
 			s.metadataHandler.AdminRoutes(r)
 		})
 

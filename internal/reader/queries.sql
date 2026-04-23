@@ -42,3 +42,15 @@ SELECT audiobook_reader_setting FROM user_settings WHERE user_id = ?;
 INSERT INTO user_settings (user_id, audiobook_reader_setting)
 VALUES (?, ?)
 ON CONFLICT(user_id) DO UPDATE SET audiobook_reader_setting = excluded.audiobook_reader_setting;
+
+-- name: GetReadingStats :one
+SELECT
+    COUNT(DISTINCT book_id) as total_books_read,
+    COALESCE(SUM(duration_secs), 0) as total_reading_time
+FROM reading_sessions
+WHERE user_id = ?;
+
+-- name: GetBooksReadThisMonth :one
+SELECT COUNT(DISTINCT book_id) as books_read_this_month
+FROM reading_sessions
+WHERE user_id = ? AND started_at >= datetime('now', 'start of month');

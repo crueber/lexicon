@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/crueber/lexicon/internal/appsettings"
 	"github.com/crueber/lexicon/internal/audit"
 	"github.com/crueber/lexicon/internal/auth"
 	"github.com/crueber/lexicon/internal/book"
@@ -58,6 +59,7 @@ type Server struct {
 	auditHandler              *audit.Handler
 	contentRestrictionHandler *contentrestriction.Handler
 	hardcoverHandler          *hardcover.Handler
+	appsettingsHandler        *appsettings.Handler
 	hub                       *ws.Hub
 	wsHandler                 *ws.Handler
 	watcher                   *library.Watcher
@@ -201,8 +203,10 @@ func New(cfg Config) (*Server, error) {
 		return p.UserID, true
 	})
 	koboHdlr.WithContentRestrictionService(contentRestrictionSvc)
+	koboHdlr.WithAuditService(auditSvc)
 
 	koreaderHdlr := koreader.NewHandler(db, logger)
+	koreaderHdlr.WithAuditService(auditSvc)
 
 	authHdlr := auth.NewHandler(db, cfg.JWTSecret, logger)
 	authHdlr.WithAuditService(auditSvc)
@@ -218,11 +222,19 @@ func New(cfg Config) (*Server, error) {
 
 	opdsHdlr := opds.NewHandler(db, logger)
 	opdsHdlr.WithContentRestrictionService(contentRestrictionSvc)
+	opdsHdlr.WithAuditService(auditSvc)
 
 	contentRestrictionHdlr := contentrestriction.NewHandler(contentRestrictionSvc, logger)
 
 	hardcoverSvc := hardcover.NewService(db, logger)
 	hardcoverHdlr := hardcover.NewHandler(hardcoverSvc)
+
+	storageHdlr := storage.NewHandler(db, cfg.DataDir, logger)
+	storageHdlr.WithAuditService(auditSvc)
+
+	appsettingsSvc := appsettings.NewService(db, logger)
+	appsettingsHdlr := appsettings.NewHandler(appsettingsSvc, logger)
+	appsettingsHdlr.WithAuditService(auditSvc)
 
 	s := &Server{
 		cfg:                       cfg,
@@ -233,7 +245,7 @@ func New(cfg Config) (*Server, error) {
 		userHandler:               userHdlr,
 		libraryHandler:            libraryHandler,
 		bookHandler:               bookHdlr,
-		storageHandler:            storage.NewHandler(db, cfg.DataDir, logger),
+		storageHandler:            storageHdlr,
 		readerHandler:             readerHdlr,
 		notebookHandler:           notebookHdlr,
 		shelfHandler:              shelfHdlr,
@@ -246,6 +258,7 @@ func New(cfg Config) (*Server, error) {
 		auditHandler:              audit.NewHandler(db, auditSvc, logger),
 		contentRestrictionHandler: contentRestrictionHdlr,
 		hardcoverHandler:          hardcoverHdlr,
+		appsettingsHandler:        appsettingsHdlr,
 		hub:                       hub,
 		wsHandler:                 wsHandler,
 		watcher:                   watcher,

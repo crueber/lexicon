@@ -663,6 +663,56 @@ func (h *Handler) handlePutAudiobookSettings(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// readingStatsResponse is the JSON response for GET /api/users/me/reading-stats.
+type readingStatsResponse struct {
+	TotalBooksRead    int64 `json:"totalBooksRead"`
+	TotalReadingTime  int64 `json:"totalReadingTime"`
+	BooksReadThisMonth int64 `json:"booksReadThisMonth"`
+}
+
+// HandleReadingStats handles GET /api/users/me/reading-stats.
+func (h *Handler) HandleReadingStats(w http.ResponseWriter, r *http.Request) {
+	principal := auth.PrincipalFromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	q := New(h.db)
+	ctx := r.Context()
+
+	stats, err := q.GetReadingStats(ctx, principal.UserID)
+	if err != nil {
+		h.logger.Error("get reading stats", "user_id", principal.UserID, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	thisMonth, err := q.GetBooksReadThisMonth(ctx, principal.UserID)
+	if err != nil {
+		h.logger.Error("get books read this month", "user_id", principal.UserID, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	// TotalReadingTime from sqlc is interface{} because of COALESCE/SUM in SQLite.
+	var totalTime int64
+	switch v := stats.TotalReadingTime.(type) {
+	case int64:
+		totalTime = v
+	case int:
+		totalTime = int64(v)
+	case float64:
+		totalTime = int64(v)
+	}
+
+	writeJSON(w, http.StatusOK, readingStatsResponse{
+		TotalBooksRead:     stats.TotalBooksRead,
+		TotalReadingTime:   totalTime,
+		BooksReadThisMonth: thisMonth,
+	})
+}
+
 // writeJSON writes a JSON response with the given status code.
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")

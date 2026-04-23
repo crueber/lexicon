@@ -39,6 +39,7 @@ func (h *Handler) WithAuditService(svc *audit.Service) {
 // RequireAuth must already be applied by the caller.
 func (h *Handler) Routes(r chi.Router) {
 	r.Get("/search", h.handleSearch)
+	r.Get("/proposals", h.handleListPendingProposals)
 	r.Post("/books/{bookId}/proposals", h.handleCreateProposal)
 	r.Get("/books/{bookId}/proposals", h.handleListProposals)
 	r.Post("/proposals/{id}/accept", h.handleAcceptProposal)
@@ -143,6 +144,58 @@ func (h *Handler) handleListProposals(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, proposals)
+}
+
+// pendingProposalResponse is the JSON representation of a pending metadata proposal.
+type pendingProposalResponse struct {
+	ID         int64  `json:"id"`
+	BookID     int64  `json:"bookId"`
+	BookTitle  string `json:"bookTitle"`
+	Provider   string `json:"provider"`
+	ProviderID string `json:"providerId"`
+	Status     string `json:"status"`
+	CreatedAt  string `json:"createdAt"`
+}
+
+// handleListPendingProposals handles GET /api/metadata/proposals.
+func (h *Handler) handleListPendingProposals(w http.ResponseWriter, r *http.Request) {
+	principal := auth.PrincipalFromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	if !principal.IsAdmin() && !principal.Permissions.CanEditMetadata {
+		writeError(w, http.StatusForbidden, "insufficient permissions")
+		return
+	}
+
+	q := New(h.svc.db)
+	rows, err := q.ListPendingProposals(r.Context())
+	if err != nil {
+		h.logger.Error("list pending proposals", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	resp := make([]pendingProposalResponse, 0, len(rows))
+	for _, row := range rows {
+		p := pendingProposalResponse{
+			ID:        row.ID,
+			BookID:    row.BookID,
+			Provider:  row.Provider,
+			Status:    row.Status,
+			CreatedAt: row.CreatedAt,
+		}
+		if row.BookTitle.Valid {
+			p.BookTitle = row.BookTitle.String
+		}
+		if row.ProviderID.Valid {
+			p.ProviderID = row.ProviderID.String
+		}
+		resp = append(resp, p)
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // handleAcceptProposal handles POST /api/metadata/proposals/{id}/accept.

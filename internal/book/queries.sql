@@ -168,3 +168,69 @@ GROUP BY b.id, bf.id;
 
 -- name: ListDismissedDuplicates :many
 SELECT book_id_a, book_id_b FROM duplicate_dismiss;
+
+-- name: ListAuthors :many
+SELECT a.id, a.name, COUNT(ba.book_id) as book_count
+FROM author a
+LEFT JOIN book_author ba ON a.id = ba.author_id
+GROUP BY a.id
+ORDER BY a.name;
+
+-- name: GetAuthorByID :one
+SELECT * FROM author WHERE id = ? LIMIT 1;
+
+-- name: ListBooksByAuthor :many
+SELECT b.id, b.library_id, b.book_type, b.added_date, bm.title, bm.cover_path
+FROM book b
+JOIN book_author ba ON b.id = ba.book_id
+LEFT JOIN book_metadata bm ON b.id = bm.book_id
+WHERE ba.author_id = ?
+ORDER BY b.added_date DESC;
+
+-- name: ListSeries :many
+SELECT s.id, s.name, COUNT(bs.book_id) as book_count
+FROM series s
+LEFT JOIN book_series bs ON s.id = bs.series_id
+GROUP BY s.id
+ORDER BY s.name;
+
+-- name: GetSeriesByID :one
+SELECT * FROM series WHERE id = ? LIMIT 1;
+
+-- name: ListBooksBySeries :many
+SELECT b.id, b.library_id, b.book_type, b.added_date, bm.title, bm.cover_path, bs.series_number
+FROM book b
+JOIN book_series bs ON b.id = bs.book_id
+LEFT JOIN book_metadata bm ON b.id = bm.book_id
+WHERE bs.series_id = ?
+ORDER BY bs.series_number, b.added_date DESC;
+
+-- name: ListCategories :many
+SELECT c.id, c.name, COUNT(bc.book_id) as book_count
+FROM category c
+LEFT JOIN book_category bc ON c.id = bc.category_id
+GROUP BY c.id
+ORDER BY c.name;
+
+-- name: ListTags :many
+SELECT t.id, t.name, COUNT(bt.book_id) as book_count
+FROM tag t
+LEFT JOIN book_tag bt ON t.id = bt.tag_id
+GROUP BY t.id
+ORDER BY t.name;
+
+-- name: ListMoods :many
+SELECT m.id, m.name, COUNT(bm.book_id) as book_count
+FROM mood m
+LEFT JOIN book_mood bm ON m.id = bm.mood_id
+GROUP BY m.id
+ORDER BY m.name;
+
+-- name: GetOrCreateMood :one
+INSERT INTO mood (name) VALUES (?) ON CONFLICT(name) DO UPDATE SET name = name RETURNING *;
+
+-- name: LinkBookMood :exec
+INSERT OR IGNORE INTO book_mood (book_id, mood_id) VALUES (?, ?);
+
+-- name: ListBookMoods :many
+SELECT m.* FROM mood m JOIN book_mood bm ON m.id = bm.mood_id WHERE bm.book_id = ?;

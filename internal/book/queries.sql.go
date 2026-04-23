@@ -126,6 +126,23 @@ func (q *Queries) DismissDuplicate(ctx context.Context, arg DismissDuplicatePara
 	return err
 }
 
+const getAuthorByID = `-- name: GetAuthorByID :one
+SELECT id, name, bio, photo_path, audnexus_id FROM author WHERE id = ? LIMIT 1
+`
+
+func (q *Queries) GetAuthorByID(ctx context.Context, id int64) (Author, error) {
+	row := q.db.QueryRowContext(ctx, getAuthorByID, id)
+	var i Author
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Bio,
+		&i.PhotoPath,
+		&i.AudnexusID,
+	)
+	return i, err
+}
+
 const getBookByFolderPath = `-- name: GetBookByFolderPath :one
 SELECT id, library_id, folder_path, book_type, created_at, added_date FROM book WHERE library_id = ? AND folder_path = ? LIMIT 1
 `
@@ -379,6 +396,17 @@ func (q *Queries) GetOrCreateCategory(ctx context.Context, name string) (Categor
 	return i, err
 }
 
+const getOrCreateMood = `-- name: GetOrCreateMood :one
+INSERT INTO mood (name) VALUES (?) ON CONFLICT(name) DO UPDATE SET name = name RETURNING id, name
+`
+
+func (q *Queries) GetOrCreateMood(ctx context.Context, name string) (Mood, error) {
+	row := q.db.QueryRowContext(ctx, getOrCreateMood, name)
+	var i Mood
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
+}
+
 const getOrCreateSeries = `-- name: GetOrCreateSeries :one
 INSERT INTO series (name) VALUES (?) ON CONFLICT(name) DO UPDATE SET name = name RETURNING id, name
 `
@@ -423,6 +451,17 @@ func (q *Queries) GetProgress(ctx context.Context, arg GetProgressParams) (UserB
 	return i, err
 }
 
+const getSeriesByID = `-- name: GetSeriesByID :one
+SELECT id, name FROM series WHERE id = ? LIMIT 1
+`
+
+func (q *Queries) GetSeriesByID(ctx context.Context, id int64) (Series, error) {
+	row := q.db.QueryRowContext(ctx, getSeriesByID, id)
+	var i Series
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
+}
+
 const linkBookAuthor = `-- name: LinkBookAuthor :exec
 INSERT OR IGNORE INTO book_author (book_id, author_id, sort_order) VALUES (?, ?, ?)
 `
@@ -449,6 +488,20 @@ type LinkBookCategoryParams struct {
 
 func (q *Queries) LinkBookCategory(ctx context.Context, arg LinkBookCategoryParams) error {
 	_, err := q.db.ExecContext(ctx, linkBookCategory, arg.BookID, arg.CategoryID)
+	return err
+}
+
+const linkBookMood = `-- name: LinkBookMood :exec
+INSERT OR IGNORE INTO book_mood (book_id, mood_id) VALUES (?, ?)
+`
+
+type LinkBookMoodParams struct {
+	BookID int64 `json:"book_id"`
+	MoodID int64 `json:"mood_id"`
+}
+
+func (q *Queries) LinkBookMood(ctx context.Context, arg LinkBookMoodParams) error {
+	_, err := q.db.ExecContext(ctx, linkBookMood, arg.BookID, arg.MoodID)
 	return err
 }
 
@@ -479,6 +532,43 @@ type LinkBookTagParams struct {
 func (q *Queries) LinkBookTag(ctx context.Context, arg LinkBookTagParams) error {
 	_, err := q.db.ExecContext(ctx, linkBookTag, arg.BookID, arg.TagID)
 	return err
+}
+
+const listAuthors = `-- name: ListAuthors :many
+SELECT a.id, a.name, COUNT(ba.book_id) as book_count
+FROM author a
+LEFT JOIN book_author ba ON a.id = ba.author_id
+GROUP BY a.id
+ORDER BY a.name
+`
+
+type ListAuthorsRow struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	BookCount int64  `json:"book_count"`
+}
+
+func (q *Queries) ListAuthors(ctx context.Context) ([]ListAuthorsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAuthors)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAuthorsRow{}
+	for rows.Next() {
+		var i ListAuthorsRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.BookCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listBookAuthors = `-- name: ListBookAuthors :many
@@ -579,6 +669,33 @@ func (q *Queries) ListBookFiles(ctx context.Context, bookID int64) ([]BookFile, 
 	return items, nil
 }
 
+const listBookMoods = `-- name: ListBookMoods :many
+SELECT m.id, m.name FROM mood m JOIN book_mood bm ON m.id = bm.mood_id WHERE bm.book_id = ?
+`
+
+func (q *Queries) ListBookMoods(ctx context.Context, bookID int64) ([]Mood, error) {
+	rows, err := q.db.QueryContext(ctx, listBookMoods, bookID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Mood{}
+	for rows.Next() {
+		var i Mood
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listBookSeries = `-- name: ListBookSeries :many
 SELECT s.id, s.name, bs.series_number FROM series s JOIN book_series bs ON s.id = bs.series_id WHERE bs.book_id = ?
 `
@@ -639,6 +756,54 @@ func (q *Queries) ListBookTags(ctx context.Context, bookID int64) ([]Tag, error)
 	return items, nil
 }
 
+const listBooksByAuthor = `-- name: ListBooksByAuthor :many
+SELECT b.id, b.library_id, b.book_type, b.added_date, bm.title, bm.cover_path
+FROM book b
+JOIN book_author ba ON b.id = ba.book_id
+LEFT JOIN book_metadata bm ON b.id = bm.book_id
+WHERE ba.author_id = ?
+ORDER BY b.added_date DESC
+`
+
+type ListBooksByAuthorRow struct {
+	ID        int64          `json:"id"`
+	LibraryID int64          `json:"library_id"`
+	BookType  string         `json:"book_type"`
+	AddedDate sql.NullString `json:"added_date"`
+	Title     sql.NullString `json:"title"`
+	CoverPath sql.NullString `json:"cover_path"`
+}
+
+func (q *Queries) ListBooksByAuthor(ctx context.Context, authorID int64) ([]ListBooksByAuthorRow, error) {
+	rows, err := q.db.QueryContext(ctx, listBooksByAuthor, authorID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBooksByAuthorRow{}
+	for rows.Next() {
+		var i ListBooksByAuthorRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.LibraryID,
+			&i.BookType,
+			&i.AddedDate,
+			&i.Title,
+			&i.CoverPath,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listBooksByLibrary = `-- name: ListBooksByLibrary :many
 SELECT id, library_id, folder_path, book_type, created_at, added_date FROM book WHERE library_id = ? ORDER BY id
 `
@@ -659,6 +824,56 @@ func (q *Queries) ListBooksByLibrary(ctx context.Context, libraryID int64) ([]Bo
 			&i.BookType,
 			&i.CreatedAt,
 			&i.AddedDate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listBooksBySeries = `-- name: ListBooksBySeries :many
+SELECT b.id, b.library_id, b.book_type, b.added_date, bm.title, bm.cover_path, bs.series_number
+FROM book b
+JOIN book_series bs ON b.id = bs.book_id
+LEFT JOIN book_metadata bm ON b.id = bm.book_id
+WHERE bs.series_id = ?
+ORDER BY bs.series_number, b.added_date DESC
+`
+
+type ListBooksBySeriesRow struct {
+	ID           int64           `json:"id"`
+	LibraryID    int64           `json:"library_id"`
+	BookType     string          `json:"book_type"`
+	AddedDate    sql.NullString  `json:"added_date"`
+	Title        sql.NullString  `json:"title"`
+	CoverPath    sql.NullString  `json:"cover_path"`
+	SeriesNumber sql.NullFloat64 `json:"series_number"`
+}
+
+func (q *Queries) ListBooksBySeries(ctx context.Context, seriesID int64) ([]ListBooksBySeriesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listBooksBySeries, seriesID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBooksBySeriesRow{}
+	for rows.Next() {
+		var i ListBooksBySeriesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.LibraryID,
+			&i.BookType,
+			&i.AddedDate,
+			&i.Title,
+			&i.CoverPath,
+			&i.SeriesNumber,
 		); err != nil {
 			return nil, err
 		}
@@ -838,6 +1053,43 @@ func (q *Queries) ListBooksWithMetadataAndAuthors(ctx context.Context) ([]ListBo
 	return items, nil
 }
 
+const listCategories = `-- name: ListCategories :many
+SELECT c.id, c.name, COUNT(bc.book_id) as book_count
+FROM category c
+LEFT JOIN book_category bc ON c.id = bc.category_id
+GROUP BY c.id
+ORDER BY c.name
+`
+
+type ListCategoriesRow struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	BookCount int64  `json:"book_count"`
+}
+
+func (q *Queries) ListCategories(ctx context.Context) ([]ListCategoriesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listCategories)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListCategoriesRow{}
+	for rows.Next() {
+		var i ListCategoriesRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.BookCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDismissedDuplicates = `-- name: ListDismissedDuplicates :many
 SELECT book_id_a, book_id_b FROM duplicate_dismiss
 `
@@ -857,6 +1109,117 @@ func (q *Queries) ListDismissedDuplicates(ctx context.Context) ([]ListDismissedD
 	for rows.Next() {
 		var i ListDismissedDuplicatesRow
 		if err := rows.Scan(&i.BookIDA, &i.BookIDB); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMoods = `-- name: ListMoods :many
+SELECT m.id, m.name, COUNT(bm.book_id) as book_count
+FROM mood m
+LEFT JOIN book_mood bm ON m.id = bm.mood_id
+GROUP BY m.id
+ORDER BY m.name
+`
+
+type ListMoodsRow struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	BookCount int64  `json:"book_count"`
+}
+
+func (q *Queries) ListMoods(ctx context.Context) ([]ListMoodsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listMoods)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMoodsRow{}
+	for rows.Next() {
+		var i ListMoodsRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.BookCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSeries = `-- name: ListSeries :many
+SELECT s.id, s.name, COUNT(bs.book_id) as book_count
+FROM series s
+LEFT JOIN book_series bs ON s.id = bs.series_id
+GROUP BY s.id
+ORDER BY s.name
+`
+
+type ListSeriesRow struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	BookCount int64  `json:"book_count"`
+}
+
+func (q *Queries) ListSeries(ctx context.Context) ([]ListSeriesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listSeries)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSeriesRow{}
+	for rows.Next() {
+		var i ListSeriesRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.BookCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTags = `-- name: ListTags :many
+SELECT t.id, t.name, COUNT(bt.book_id) as book_count
+FROM tag t
+LEFT JOIN book_tag bt ON t.id = bt.tag_id
+GROUP BY t.id
+ORDER BY t.name
+`
+
+type ListTagsRow struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	BookCount int64  `json:"book_count"`
+}
+
+func (q *Queries) ListTags(ctx context.Context) ([]ListTagsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTags)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTagsRow{}
+	for rows.Next() {
+		var i ListTagsRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.BookCount); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

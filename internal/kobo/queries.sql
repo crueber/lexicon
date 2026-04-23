@@ -21,3 +21,6 @@ ON CONFLICT(user_id, content_id) DO UPDATE SET
 
 -- name: ListKoboReadingStates :many
 SELECT * FROM kobo_reading_state WHERE user_id = ?;
+
+-- name: DeleteKoboReadingState :exec
+DELETE FROM kobo_reading_state WHERE user_id = ? AND content_id = ?;

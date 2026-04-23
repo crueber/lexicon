@@ -14,18 +14,21 @@ import (
 	"log/slog"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/crueber/lexicon/internal/audit"
 	"github.com/crueber/lexicon/internal/book"
 	"github.com/crueber/lexicon/internal/user"
 )
 
 // Handler handles KOSync protocol requests.
 type Handler struct {
-	db     *sql.DB
-	logger *slog.Logger
+	db       *sql.DB
+	logger   *slog.Logger
+	auditSvc *audit.Service
 }
 
 // Compile-time interface check.
@@ -37,6 +40,11 @@ func NewHandler(db *sql.DB, logger *slog.Logger) *Handler {
 		db:     db,
 		logger: logger,
 	}
+}
+
+// WithAuditService sets the audit service for logging KOReader events.
+func (h *Handler) WithAuditService(svc *audit.Service) {
+	h.auditSvc = svc
 }
 
 // ServeHTTP implements http.Handler (required for compile-time check).
@@ -178,6 +186,23 @@ func (h *Handler) handleUpdateProgress(w http.ResponseWriter, r *http.Request) {
 	// to user_book_file_progress by matching the document filename.
 	if koUser.UserID.Valid {
 		h.syncProgressToLexicon(ctx, koUser.UserID.Int64, req.Document, req.Progress, req.Percentage)
+	}
+
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		var userID int64
+		if koUser.UserID.Valid {
+			userID = koUser.UserID.Int64
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			UserID:       &userID,
+			Action:       audit.ActionKOReaderSync,
+			ResourceType: "koreader",
+			IPAddress:    ip,
+		})
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{

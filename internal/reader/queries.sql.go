@@ -55,6 +55,19 @@ func (q *Queries) GetBookFileForReader(ctx context.Context, arg GetBookFileForRe
 	return i, err
 }
 
+const getBooksReadThisMonth = `-- name: GetBooksReadThisMonth :one
+SELECT COUNT(DISTINCT book_id) as books_read_this_month
+FROM reading_sessions
+WHERE user_id = ? AND started_at >= datetime('now', 'start of month')
+`
+
+func (q *Queries) GetBooksReadThisMonth(ctx context.Context, userID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getBooksReadThisMonth, userID)
+	var books_read_this_month int64
+	err := row.Scan(&books_read_this_month)
+	return books_read_this_month, err
+}
+
 const getReaderSettings = `-- name: GetReaderSettings :one
 SELECT epub_reader_setting, pdf_reader_setting FROM user_settings WHERE user_id = ?
 `
@@ -96,6 +109,26 @@ func (q *Queries) GetReadingProgress(ctx context.Context, arg GetReadingProgress
 		&i.ProgressType,
 		&i.UpdatedAt,
 	)
+	return i, err
+}
+
+const getReadingStats = `-- name: GetReadingStats :one
+SELECT
+    COUNT(DISTINCT book_id) as total_books_read,
+    COALESCE(SUM(duration_secs), 0) as total_reading_time
+FROM reading_sessions
+WHERE user_id = ?
+`
+
+type GetReadingStatsRow struct {
+	TotalBooksRead   int64       `json:"total_books_read"`
+	TotalReadingTime interface{} `json:"total_reading_time"`
+}
+
+func (q *Queries) GetReadingStats(ctx context.Context, userID int64) (GetReadingStatsRow, error) {
+	row := q.db.QueryRowContext(ctx, getReadingStats, userID)
+	var i GetReadingStatsRow
+	err := row.Scan(&i.TotalBooksRead, &i.TotalReadingTime)
 	return i, err
 }
 

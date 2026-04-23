@@ -97,6 +97,57 @@ func (q *Queries) ListMetadataProposals(ctx context.Context, bookID int64) ([]Me
 	return items, nil
 }
 
+const listPendingProposals = `-- name: ListPendingProposals :many
+SELECT mp.id, mp.book_id, mp.provider, mp.provider_id, mp.status, mp.data, mp.created_at, bm.title as book_title
+FROM metadata_proposal mp
+LEFT JOIN book_metadata bm ON mp.book_id = bm.book_id
+WHERE mp.status = 'PENDING'
+ORDER BY mp.created_at DESC
+`
+
+type ListPendingProposalsRow struct {
+	ID         int64          `json:"id"`
+	BookID     int64          `json:"book_id"`
+	Provider   string         `json:"provider"`
+	ProviderID sql.NullString `json:"provider_id"`
+	Status     string         `json:"status"`
+	Data       string         `json:"data"`
+	CreatedAt  string         `json:"created_at"`
+	BookTitle  sql.NullString `json:"book_title"`
+}
+
+func (q *Queries) ListPendingProposals(ctx context.Context) ([]ListPendingProposalsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPendingProposals)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPendingProposalsRow{}
+	for rows.Next() {
+		var i ListPendingProposalsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.BookID,
+			&i.Provider,
+			&i.ProviderID,
+			&i.Status,
+			&i.Data,
+			&i.CreatedAt,
+			&i.BookTitle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateProposalStatus = `-- name: UpdateProposalStatus :exec
 UPDATE metadata_proposal SET status = ? WHERE id = ?
 `
