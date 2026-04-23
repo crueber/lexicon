@@ -164,6 +164,12 @@ func (s *Server) setupRoutes() {
 			s.metadataHandler.Routes(r)
 		})
 
+		// BookDrop routes (require auth).
+		r.Route("/bookdrop/files", func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			s.bookdropHandler.Routes(r)
+		})
+
 		// Admin metadata settings routes (require auth + admin).
 		r.Route("/admin/settings", func(r chi.Router) {
 			r.Use(auth.RequireAuth(s.cfg.JWTSecret))

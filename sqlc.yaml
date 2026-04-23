@@ -119,3 +119,12 @@ sql:
         out: "internal/contentrestriction"
         emit_json_tags: true
         emit_empty_slices: true
+  - engine: "sqlite"
+    queries: "internal/bookdrop/queries.sql"
+    schema: "migrations/"
+    gen:
+      go:
+        package: "bookdrop"
+        out: "internal/bookdrop"
+        emit_json_tags: true
+        emit_empty_slices: true

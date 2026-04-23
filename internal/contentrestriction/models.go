@@ -136,6 +136,20 @@ type BookVector struct {
 	UpdatedAt string `json:"updated_at"`
 }
 
+type BookdropFile struct {
+	ID                 int64          `json:"id"`
+	OriginalFilename   string         `json:"original_filename"`
+	FilePath           string         `json:"file_path"`
+	FileSize           int64          `json:"file_size"`
+	Status             string         `json:"status"`
+	ExtractedTitle     sql.NullString `json:"extracted_title"`
+	ExtractedAuthors   sql.NullString `json:"extracted_authors"`
+	ExtractedCoverPath sql.NullString `json:"extracted_cover_path"`
+	CreatedAt          string         `json:"created_at"`
+	ProcessedAt        sql.NullString `json:"processed_at"`
+	ImportedBookID     sql.NullInt64  `json:"imported_book_id"`
+}
+
 type Category struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`

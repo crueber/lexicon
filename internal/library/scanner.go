@@ -647,6 +647,35 @@ func (s *Scanner) createBookWithFile(ctx context.Context, libraryID int64, path,
 	return nil
 }
 
+// ScanSingleFile processes a single file and creates or updates the
+// corresponding book record. It returns the book ID.
+func (s *Scanner) ScanSingleFile(ctx context.Context, libraryID int64, path string) (int64, error) {
+	ext := strings.ToLower(filepath.Ext(path))
+	format, ok := supportedFormats[ext]
+	if !ok {
+		return 0, fmt.Errorf("unsupported file format: %s", ext)
+	}
+
+	q := New(s.db)
+	lib, err := q.GetLibraryByID(ctx, libraryID)
+	if err != nil {
+		return 0, fmt.Errorf("get library: %w", err)
+	}
+
+	result := &ScanResult{}
+	if err := s.processFileBookPerFile(ctx, lib, path, format, result); err != nil {
+		return 0, err
+	}
+
+	bq := bookpkg.New(s.db)
+	bf, err := bq.GetBookFileByPath(ctx, path)
+	if err != nil {
+		return 0, fmt.Errorf("find book file: %w", err)
+	}
+
+	return bf.BookID, nil
+}
+
 // extractAndSaveCover attempts to extract a cover from the given file and save
 // it to the data directory. Failures are logged at Debug level and do not
 // propagate — cover extraction is best-effort.

@@ -18,6 +18,7 @@ import (
 	"github.com/crueber/lexicon/internal/audit"
 	"github.com/crueber/lexicon/internal/auth"
 	"github.com/crueber/lexicon/internal/book"
+	"github.com/crueber/lexicon/internal/bookdrop"
 	"github.com/crueber/lexicon/internal/contentrestriction"
 	"github.com/crueber/lexicon/internal/dashboard"
 	"github.com/crueber/lexicon/internal/hardcover"
@@ -60,9 +61,11 @@ type Server struct {
 	contentRestrictionHandler *contentrestriction.Handler
 	hardcoverHandler          *hardcover.Handler
 	appsettingsHandler        *appsettings.Handler
+	bookdropHandler           *bookdrop.Handler
 	hub                       *ws.Hub
 	wsHandler                 *ws.Handler
 	watcher                   *library.Watcher
+	bookdropWatcher           *bookdrop.Watcher
 	taskRunner                *task.Runner
 	taskScheduler             *task.Scheduler
 	taskHandler               *task.Handler
@@ -113,6 +116,17 @@ func New(cfg Config) (*Server, error) {
 
 	// Register file organization task.
 	taskRunner.Register(task.TypeFileOrganization, task.NewFileOrganizationFunc(db, logger))
+
+	// Set up BookDrop watcher and task.
+	var bookdropWatcher *bookdrop.Watcher
+	if cfg.BookdropEnabled {
+		bookdropWatcher, err = bookdrop.NewWatcher(cfg.BookdropPath, db, logger, hub)
+		if err != nil {
+			logger.Warn("failed to create bookdrop watcher", "error", err)
+		} else {
+			taskRunner.Register(task.TypeBookdropScan, task.NewBookdropScanFunc(cfg.BookdropPath, db, hub, logger))
+		}
+	}
 
 	// Set up the content restriction service.
 	contentRestrictionSvc := contentrestriction.NewService(db, logger)
@@ -236,6 +250,10 @@ func New(cfg Config) (*Server, error) {
 	appsettingsHdlr := appsettings.NewHandler(appsettingsSvc, logger)
 	appsettingsHdlr.WithAuditService(auditSvc)
 
+	bookdropSvc := bookdrop.NewService(db, libraryScanner, logger)
+	bookdropHdlr := bookdrop.NewHandler(bookdropSvc, db, logger)
+	bookdropHdlr.WithAuditService(auditSvc)
+
 	s := &Server{
 		cfg:                       cfg,
 		db:                        db,
@@ -259,9 +277,11 @@ func New(cfg Config) (*Server, error) {
 		contentRestrictionHandler: contentRestrictionHdlr,
 		hardcoverHandler:          hardcoverHdlr,
 		appsettingsHandler:        appsettingsHdlr,
+		bookdropHandler:           bookdropHdlr,
 		hub:                       hub,
 		wsHandler:                 wsHandler,
 		watcher:                   watcher,
+		bookdropWatcher:           bookdropWatcher,
 		taskRunner:                taskRunner,
 		taskScheduler:             taskScheduler,
 		taskHandler:               taskHandler,
@@ -342,6 +362,21 @@ func (s *Server) Start() error {
 		}
 	}()
 
+	// Start the bookdrop watcher in a background goroutine if enabled.
+	var bookdropWatcherDone chan struct{}
+	var bookdropWatcherCancel context.CancelFunc
+	if s.bookdropWatcher != nil {
+		var bdCtx context.Context
+		bdCtx, bookdropWatcherCancel = context.WithCancel(context.Background())
+		bookdropWatcherDone = make(chan struct{})
+		go func() {
+			defer close(bookdropWatcherDone)
+			if err := s.bookdropWatcher.Start(bdCtx); err != nil {
+				s.logger.Error("bookdrop watcher error", "error", err)
+			}
+		}()
+	}
+
 	// Channel to capture server errors from ListenAndServe.
 	errCh := make(chan error, 1)
 	go func() {
@@ -363,6 +398,11 @@ func (s *Server) Start() error {
 		watcherCancel()
 		_ = s.watcher.Close()
 		<-watcherDone
+		if bookdropWatcherCancel != nil {
+			bookdropWatcherCancel()
+			_ = s.bookdropWatcher.Stop()
+			<-bookdropWatcherDone
+		}
 		return fmt.Errorf("server listen: %w", err)
 	}
 
@@ -373,6 +413,13 @@ func (s *Server) Start() error {
 	watcherCancel()
 	_ = s.watcher.Close()
 	<-watcherDone
+
+	// Stop the bookdrop watcher.
+	if bookdropWatcherCancel != nil {
+		bookdropWatcherCancel()
+		_ = s.bookdropWatcher.Stop()
+		<-bookdropWatcherDone
+	}
 
 	// Give active connections 10 seconds to finish.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

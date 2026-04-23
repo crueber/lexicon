@@ -11,4 +11,6 @@ type Config struct {
 	GoogleBooksAPIKey string `env:"GOOGLE_BOOKS_API_KEY" envDefault:""`
 	HardcoverAPIKey   string `env:"HARDCOVER_API_KEY" envDefault:""`
 	ComicVineAPIKey   string `env:"COMICVINE_API_KEY" envDefault:""`
+	BookdropPath      string `env:"BOOKDROP_PATH" envDefault:"/bookdrop"`
+	BookdropEnabled   bool   `env:"BOOKDROP_ENABLED" envDefault:"false"`
 }
