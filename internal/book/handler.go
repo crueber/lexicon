@@ -15,6 +15,7 @@ import (
 
 	"github.com/crueber/lexicon/internal/audit"
 	"github.com/crueber/lexicon/internal/auth"
+	"github.com/crueber/lexicon/internal/contentrestriction"
 )
 
 // shelfHandler is the interface for the shelf handler's book-shelves endpoint.
@@ -25,10 +26,11 @@ type shelfHandler interface {
 
 // Handler handles HTTP requests for book management.
 type Handler struct {
-	db           *sql.DB
-	logger       *slog.Logger
-	shelfHandler shelfHandler
-	auditSvc     *audit.Service
+	db                    *sql.DB
+	logger                *slog.Logger
+	shelfHandler          shelfHandler
+	auditSvc              *audit.Service
+	contentRestrictionSvc *contentrestriction.Service
 }
 
 // NewHandler creates a new book Handler.
@@ -47,6 +49,11 @@ func (h *Handler) WithShelfHandler(sh shelfHandler) {
 // WithAuditService sets the audit service for logging book events.
 func (h *Handler) WithAuditService(svc *audit.Service) {
 	h.auditSvc = svc
+}
+
+// WithContentRestrictionService sets the content restriction service for filtering book listings.
+func (h *Handler) WithContentRestrictionService(svc *contentrestriction.Service) {
+	h.contentRestrictionSvc = svc
 }
 
 // Routes registers all book routes on the given router.
@@ -257,6 +264,32 @@ func (h *Handler) handleList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Apply content restrictions.
+	if h.contentRestrictionSvc != nil && principal != nil {
+		bookIDs := make([]int64, len(bookRows))
+		for i, b := range bookRows {
+			bookIDs[i] = b.ID
+		}
+		filteredIDs, filterErr := h.contentRestrictionSvc.FilterBookIDs(r.Context(), principal.UserID, principal.IsAdmin(), bookIDs)
+		if filterErr != nil {
+			h.logger.Error("filter book ids", "error", filterErr)
+			// Non-fatal: continue without filtering.
+		} else {
+			idSet := make(map[int64]struct{}, len(filteredIDs))
+			for _, id := range filteredIDs {
+				idSet[id] = struct{}{}
+			}
+			var filtered []ListBooksWithMetadataRow
+			for _, b := range bookRows {
+				if _, ok := idSet[b.ID]; ok {
+					filtered = append(filtered, b)
+				}
+			}
+			bookRows = filtered
+			// total remains the unfiltered SQL count; pagination totals may be slightly off for restricted users.
+		}
+	}
+
 	q := New(h.db)
 	books := make([]BookResponse, 0, len(bookRows))
 	for _, row := range bookRows {
@@ -397,6 +430,18 @@ func (h *Handler) handleGet(w http.ResponseWriter, r *http.Request) {
 		h.logger.Error("get book with metadata", "book_id", id, "error", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
+	}
+
+	// Apply content restrictions.
+	if h.contentRestrictionSvc != nil && principal != nil && !principal.IsAdmin() {
+		filteredIDs, filterErr := h.contentRestrictionSvc.FilterBookIDs(ctx, principal.UserID, principal.IsAdmin(), []int64{id})
+		if filterErr != nil {
+			h.logger.Error("filter book id", "book_id", id, "error", filterErr)
+			// Non-fatal: continue without filtering.
+		} else if len(filteredIDs) == 0 {
+			writeError(w, http.StatusNotFound, "book not found")
+			return
+		}
 	}
 
 	// Fetch authors.

@@ -25,15 +25,17 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/crueber/lexicon/internal/book"
+	"github.com/crueber/lexicon/internal/contentrestriction"
 	"github.com/crueber/lexicon/internal/user"
 )
 
 // Handler handles Kobo store API proxy requests.
 type Handler struct {
-	db                 *sql.DB
-	dataDir            string
-	logger             *slog.Logger
-	principalExtractor func(*http.Request) (int64, bool)
+	db                    *sql.DB
+	dataDir               string
+	logger                *slog.Logger
+	principalExtractor    func(*http.Request) (int64, bool)
+	contentRestrictionSvc *contentrestriction.Service
 }
 
 // Compile-time interface check.
@@ -48,16 +50,21 @@ func NewHandler(db *sql.DB, dataDir string, logger *slog.Logger) *Handler {
 	}
 }
 
-// ServeHTTP implements http.Handler (required for compile-time check).
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	http.NotFound(w, r)
-}
-
 // WithPrincipalExtractor sets the function used to extract the user ID from
 // an authenticated request. This avoids an import cycle between kobo and auth.
 // Must be called before serving token requests.
 func (h *Handler) WithPrincipalExtractor(fn func(*http.Request) (int64, bool)) {
 	h.principalExtractor = fn
+}
+
+// WithContentRestrictionService sets the content restriction service for filtering Kobo sync results.
+func (h *Handler) WithContentRestrictionService(svc *contentrestriction.Service) {
+	h.contentRestrictionSvc = svc
+}
+
+// ServeHTTP implements http.Handler (required for compile-time check).
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	http.NotFound(w, r)
 }
 
 // Routes registers all Kobo store API proxy routes.
@@ -374,11 +381,42 @@ func (h *Handler) handleLibrarySync(w http.ResponseWriter, r *http.Request) {
 
 	var entries []bookEntitlement
 
+	// Check admin status for content restrictions.
+	var isAdmin bool
+	if perms, permErr := uq.GetUserPermissions(ctx, userID); permErr == nil {
+		isAdmin = perms.Role == "ADMIN"
+	}
+
 	for _, libID := range libraryIDs {
 		books, err := bq.ListBooksByLibrary(ctx, libID)
 		if err != nil {
 			h.logger.Error("list books by library", "library_id", libID, "error", err)
 			continue
+		}
+
+		// Apply content restrictions.
+		if h.contentRestrictionSvc != nil && !isAdmin && len(books) > 0 {
+			bookIDs := make([]int64, len(books))
+			for i, b := range books {
+				bookIDs[i] = b.ID
+			}
+			filteredIDs, filterErr := h.contentRestrictionSvc.FilterBookIDs(ctx, userID, isAdmin, bookIDs)
+			if filterErr != nil {
+				h.logger.Error("filter kobo sync books", "error", filterErr)
+				// Non-fatal: continue without filtering.
+			} else {
+				idSet := make(map[int64]struct{}, len(filteredIDs))
+				for _, id := range filteredIDs {
+					idSet[id] = struct{}{}
+				}
+				var filtered []book.Book
+				for _, b := range books {
+					if _, ok := idSet[b.ID]; ok {
+						filtered = append(filtered, b)
+					}
+				}
+				books = filtered
+			}
 		}
 
 		for _, b := range books {

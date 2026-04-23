@@ -17,6 +17,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/crueber/lexicon/internal/book"
+	"github.com/crueber/lexicon/internal/contentrestriction"
 	"github.com/crueber/lexicon/internal/library"
 	"github.com/crueber/lexicon/internal/shelf"
 	"github.com/crueber/lexicon/internal/user"
@@ -34,8 +35,9 @@ const (
 // Handler handles OPDS catalog HTTP requests.
 // OPDS uses HTTP Basic Auth rather than JWT Bearer tokens.
 type Handler struct {
-	db     *sql.DB
-	logger *slog.Logger
+	db                    *sql.DB
+	logger                *slog.Logger
+	contentRestrictionSvc *contentrestriction.Service
 }
 
 // Compile-time interface check.
@@ -47,6 +49,11 @@ func NewHandler(db *sql.DB, logger *slog.Logger) *Handler {
 		db:     db,
 		logger: logger,
 	}
+}
+
+// WithContentRestrictionService sets the content restriction service for filtering OPDS results.
+func (h *Handler) WithContentRestrictionService(svc *contentrestriction.Service) {
+	h.contentRestrictionSvc = svc
 }
 
 // ServeHTTP implements http.Handler (required for compile-time check).
@@ -214,6 +221,28 @@ func (h *Handler) handleAllBooks(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		// Apply content restrictions.
+		if len(books) > 0 {
+			bookIDs := make([]int64, len(books))
+			for i, b := range books {
+				bookIDs[i] = b.ID
+			}
+			filteredIDs, filterErr := h.filterOPDSBookIDs(ctx, r, bookIDs)
+			if filterErr == nil {
+				idSet := make(map[int64]struct{}, len(filteredIDs))
+				for _, id := range filteredIDs {
+					idSet[id] = struct{}{}
+				}
+				var filtered []book.ListBooksWithMetadataRow
+				for _, b := range books {
+					if _, ok := idSet[b.ID]; ok {
+						filtered = append(filtered, b)
+					}
+				}
+				books = filtered
+			}
+		}
+
 		for _, b := range books {
 			entry, err := h.buildBookEntry(ctx, b.ID, b.Title, b.CoverPath, b.AddedDate)
 			if err != nil {
@@ -333,6 +362,28 @@ func (h *Handler) handleLibraryBooks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Apply content restrictions.
+	if len(books) > 0 {
+		bookIDs := make([]int64, len(books))
+		for i, b := range books {
+			bookIDs[i] = b.ID
+		}
+		filteredIDs, filterErr := h.filterOPDSBookIDs(ctx, r, bookIDs)
+		if filterErr == nil {
+			idSet := make(map[int64]struct{}, len(filteredIDs))
+			for _, id := range filteredIDs {
+				idSet[id] = struct{}{}
+			}
+			var filtered []book.ListBooksWithMetadataRow
+			for _, b := range books {
+				if _, ok := idSet[b.ID]; ok {
+					filtered = append(filtered, b)
+				}
+			}
+			books = filtered
+		}
+	}
+
 	entries := make([]Entry, 0, len(books))
 	for _, b := range books {
 		entry, err := h.buildBookEntry(ctx, b.ID, b.Title, b.CoverPath, b.AddedDate)
@@ -450,6 +501,28 @@ func (h *Handler) handleShelfBooks(w http.ResponseWriter, r *http.Request) {
 		h.logger.Error("opds shelf books: list", "shelf_id", shelfID, "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
+	}
+
+	// Apply content restrictions.
+	if len(booksInShelf) > 0 {
+		bookIDs := make([]int64, len(booksInShelf))
+		for i, b := range booksInShelf {
+			bookIDs[i] = b.ID
+		}
+		filteredIDs, filterErr := h.filterOPDSBookIDs(ctx, r, bookIDs)
+		if filterErr == nil {
+			idSet := make(map[int64]struct{}, len(filteredIDs))
+			for _, id := range filteredIDs {
+				idSet[id] = struct{}{}
+			}
+			var filtered []shelf.ListBooksInShelfRow
+			for _, b := range booksInShelf {
+				if _, ok := idSet[b.ID]; ok {
+					filtered = append(filtered, b)
+				}
+			}
+			booksInShelf = filtered
+		}
 	}
 
 	// Apply pagination manually since ListBooksInShelf doesn't support it.
@@ -646,6 +719,32 @@ func (h *Handler) userFromRequest(r *http.Request) (user.User, bool) {
 	}
 
 	return u, true
+}
+
+// isAdminUser returns the user ID, whether they are an admin, and whether the user was found.
+func (h *Handler) isAdminUser(ctx context.Context, r *http.Request) (int64, bool, bool) {
+	u, ok := h.userFromRequest(r)
+	if !ok {
+		return 0, false, false
+	}
+	q := user.New(h.db)
+	perms, err := q.GetUserPermissions(ctx, u.ID)
+	if err != nil {
+		return u.ID, false, true
+	}
+	return u.ID, perms.Role == "ADMIN", true
+}
+
+// filterOPDSBookIDs applies content restrictions to a slice of book IDs for the OPDS user.
+func (h *Handler) filterOPDSBookIDs(ctx context.Context, r *http.Request, bookIDs []int64) ([]int64, error) {
+	if h.contentRestrictionSvc == nil {
+		return bookIDs, nil
+	}
+	userID, isAdmin, ok := h.isAdminUser(ctx, r)
+	if !ok {
+		return bookIDs, nil
+	}
+	return h.contentRestrictionSvc.FilterBookIDs(ctx, userID, isAdmin, bookIDs)
 }
 
 // writeXML writes an XML response with the OPDS content type.

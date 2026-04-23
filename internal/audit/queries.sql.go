@@ -29,6 +29,9 @@ type CountAuditLogsFilteredParams struct {
 	CreatedAt_2 string        `json:"created_at_2"`
 }
 
+// Parameters: 1=action_check, 2=action, 3=user_id_check, 4=user_id,
+//
+//	5=from_check, 6=from_date, 7=to_check, 8=to_date
 func (q *Queries) CountAuditLogsFiltered(ctx context.Context, arg CountAuditLogsFilteredParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countAuditLogsFiltered,
 		arg.Column1,
@@ -121,6 +124,9 @@ type ListAuditLogsFilteredParams struct {
 	Offset      int64         `json:"offset"`
 }
 
+// Parameters: 1=action_check, 2=action, 3=user_id_check, 4=user_id,
+//
+//	5=from_check, 6=from_date, 7=to_check, 8=to_date
 func (q *Queries) ListAuditLogsFiltered(ctx context.Context, arg ListAuditLogsFilteredParams) ([]AuditLog, error) {
 	rows, err := q.db.QueryContext(ctx, listAuditLogsFiltered,
 		arg.Column1,

@@ -10,12 +10,14 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/crueber/lexicon/internal/auth"
+	"github.com/crueber/lexicon/internal/contentrestriction"
 )
 
 // Handler handles HTTP requests for the notebook (annotations) endpoints.
 type Handler struct {
-	db     *sql.DB
-	logger *slog.Logger
+	db                    *sql.DB
+	logger                *slog.Logger
+	contentRestrictionSvc *contentrestriction.Service
 }
 
 // Compile-time interface check.
@@ -27,6 +29,11 @@ func NewHandler(db *sql.DB, logger *slog.Logger) *Handler {
 		db:     db,
 		logger: logger,
 	}
+}
+
+// WithContentRestrictionService sets the content restriction service for filtering notebook annotations.
+func (h *Handler) WithContentRestrictionService(svc *contentrestriction.Service) {
+	h.contentRestrictionSvc = svc
 }
 
 // ServeHTTP implements http.Handler (required for compile-time check).
@@ -336,6 +343,18 @@ func (h *Handler) handleListAllAnnotations(w http.ResponseWriter, r *http.Reques
 			return
 		}
 
+		// Apply content restrictions.
+		if h.contentRestrictionSvc != nil && principal != nil && !principal.IsAdmin() {
+			filteredIDs, filterErr := h.contentRestrictionSvc.FilterBookIDs(ctx, principal.UserID, principal.IsAdmin(), []int64{bookID})
+			if filterErr != nil {
+				h.logger.Error("filter notebook book", "book_id", bookID, "error", filterErr)
+				// Non-fatal: continue without filtering.
+			} else if len(filteredIDs) == 0 {
+				writeJSON(w, http.StatusOK, []annotationResponse{})
+				return
+			}
+		}
+
 		resp := make([]annotationResponse, 0, len(annotations))
 		for _, a := range annotations {
 			resp = append(resp, annotationToResponse(a))
@@ -403,6 +422,32 @@ func (h *Handler) handleListAllAnnotations(w http.ResponseWriter, r *http.Reques
 			item.CoverPath = &v
 		}
 		items = append(items, item)
+	}
+
+	// Apply content restrictions.
+	if h.contentRestrictionSvc != nil && principal != nil && !principal.IsAdmin() && len(items) > 0 {
+		bookIDs := make([]int64, len(items))
+		for i, item := range items {
+			bookIDs[i] = item.BookID
+		}
+		filteredIDs, filterErr := h.contentRestrictionSvc.FilterBookIDs(ctx, principal.UserID, principal.IsAdmin(), bookIDs)
+		if filterErr != nil {
+			h.logger.Error("filter notebook annotations", "error", filterErr)
+			// Non-fatal: continue without filtering.
+		} else {
+			idSet := make(map[int64]struct{}, len(filteredIDs))
+			for _, id := range filteredIDs {
+				idSet[id] = struct{}{}
+			}
+			var filtered []annotationWithBookResponse
+			for _, item := range items {
+				if _, ok := idSet[item.BookID]; ok {
+					filtered = append(filtered, item)
+				}
+			}
+			items = filtered
+			// total remains the unfiltered SQL count; pagination totals may be slightly off for restricted users.
+		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{

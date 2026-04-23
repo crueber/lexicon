@@ -17,6 +17,7 @@ import (
 	"github.com/crueber/lexicon/internal/audit"
 	"github.com/crueber/lexicon/internal/auth"
 	"github.com/crueber/lexicon/internal/book"
+	"github.com/crueber/lexicon/internal/contentrestriction"
 	"github.com/crueber/lexicon/internal/dashboard"
 	"github.com/crueber/lexicon/internal/kobo"
 	"github.com/crueber/lexicon/internal/koreader"
@@ -39,27 +40,28 @@ type Server struct {
 	db               *sql.DB
 	router           *chi.Mux
 	logger           *slog.Logger
-	authHandler      *auth.Handler
-	userHandler      *user.Handler
-	libraryHandler   *library.Handler
-	bookHandler      *book.Handler
-	storageHandler   *storage.Handler
-	readerHandler    *reader.Handler
-	notebookHandler  *notebook.Handler
-	shelfHandler     *shelf.Handler
-	dashboardHandler *dashboard.Handler
-	metadataHandler  *metadata.Handler
-	opdsHandler      *opds.Handler
-	koboHandler      *kobo.Handler
-	koreaderHandler      *koreader.Handler
-	recommendationHandler *recommendation.Handler
-	auditHandler         *audit.Handler
-	hub                  *ws.Hub
-	wsHandler            *ws.Handler
-	watcher              *library.Watcher
-	taskRunner           *task.Runner
-	taskScheduler        *task.Scheduler
-	taskHandler          *task.Handler
+	authHandler               *auth.Handler
+	userHandler               *user.Handler
+	libraryHandler            *library.Handler
+	bookHandler               *book.Handler
+	storageHandler            *storage.Handler
+	readerHandler             *reader.Handler
+	notebookHandler           *notebook.Handler
+	shelfHandler              *shelf.Handler
+	dashboardHandler          *dashboard.Handler
+	metadataHandler           *metadata.Handler
+	opdsHandler               *opds.Handler
+	koboHandler               *kobo.Handler
+	koreaderHandler           *koreader.Handler
+	recommendationHandler     *recommendation.Handler
+	auditHandler              *audit.Handler
+	contentRestrictionHandler *contentrestriction.Handler
+	hub                       *ws.Hub
+	wsHandler                 *ws.Handler
+	watcher                   *library.Watcher
+	taskRunner                *task.Runner
+	taskScheduler             *task.Scheduler
+	taskHandler               *task.Handler
 }
 
 // New creates a new Server with the given configuration, opens the database,
@@ -102,6 +104,9 @@ func New(cfg Config) (*Server, error) {
 		return auditSvc.Cleanup(ctx, 365)
 	})
 
+	// Set up the content restriction service.
+	contentRestrictionSvc := contentrestriction.NewService(db, logger)
+
 	libraryHandler := library.NewHandler(librarySvc, libraryScanner, logger)
 	libraryHandler.WithTaskEnqueue(func(taskType, payload string) (int64, error) {
 		return taskRunner.Enqueue(context.Background(), taskType, payload)
@@ -111,10 +116,12 @@ func New(cfg Config) (*Server, error) {
 	shelfSvc := shelf.NewService(db, logger)
 	shelfHdlr := shelf.NewHandler(shelfSvc, logger)
 	shelfHdlr.WithAuditService(auditSvc)
+	shelfHdlr.WithContentRestrictionService(contentRestrictionSvc)
 
 	bookHdlr := book.NewHandler(db, logger)
 	bookHdlr.WithShelfHandler(shelfHdlr)
 	bookHdlr.WithAuditService(auditSvc)
+	bookHdlr.WithContentRestrictionService(contentRestrictionSvc)
 
 	// Build the user handler with injected dependencies to avoid import cycles.
 	// The user package cannot import auth (auth imports user), so we inject
@@ -168,6 +175,7 @@ func New(cfg Config) (*Server, error) {
 	// Set up the recommendation service.
 	recSvc := recommendation.NewService(db, logger)
 	recHdlr := recommendation.NewHandler(recSvc, logger)
+	recHdlr.WithContentRestrictionService(contentRestrictionSvc)
 
 	// Register background tasks.
 	taskRunner.Register(task.TypeRecommendationRebuild, recommendation.NewRebuildFunc(recSvc))
@@ -181,6 +189,7 @@ func New(cfg Config) (*Server, error) {
 		}
 		return p.UserID, true
 	})
+	koboHdlr.WithContentRestrictionService(contentRestrictionSvc)
 
 	koreaderHdlr := koreader.NewHandler(db, logger)
 
@@ -190,32 +199,44 @@ func New(cfg Config) (*Server, error) {
 	readerHdlr := reader.NewHandler(db, logger)
 	readerHdlr.WithAuditService(auditSvc)
 
+	dashboardHdlr := dashboard.NewHandler(db, logger)
+	dashboardHdlr.WithContentRestrictionService(contentRestrictionSvc)
+
+	notebookHdlr := notebook.NewHandler(db, logger)
+	notebookHdlr.WithContentRestrictionService(contentRestrictionSvc)
+
+	opdsHdlr := opds.NewHandler(db, logger)
+	opdsHdlr.WithContentRestrictionService(contentRestrictionSvc)
+
+	contentRestrictionHdlr := contentrestriction.NewHandler(contentRestrictionSvc, logger)
+
 	s := &Server{
-		cfg:              cfg,
-		db:               db,
-		router:           chi.NewRouter(),
-		logger:           logger,
-		authHandler:      authHdlr,
-		userHandler:      userHdlr,
-		libraryHandler:   libraryHandler,
-		bookHandler:      bookHdlr,
-		storageHandler:   storage.NewHandler(db, cfg.DataDir, logger),
-		readerHandler:    readerHdlr,
-		notebookHandler:  notebook.NewHandler(db, logger),
-		shelfHandler:     shelfHdlr,
-		dashboardHandler: dashboard.NewHandler(db, logger),
-		metadataHandler:  metadataHdlr,
-		opdsHandler:      opds.NewHandler(db, logger),
-		koboHandler:           koboHdlr,
-		koreaderHandler:       koreaderHdlr,
-		recommendationHandler: recHdlr,
-		auditHandler:         audit.NewHandler(db, auditSvc, logger),
-		hub:                  hub,
-		wsHandler:        wsHandler,
-		watcher:          watcher,
-		taskRunner:       taskRunner,
-		taskScheduler:    taskScheduler,
-		taskHandler:      taskHandler,
+		cfg:                       cfg,
+		db:                        db,
+		router:                    chi.NewRouter(),
+		logger:                    logger,
+		authHandler:               authHdlr,
+		userHandler:               userHdlr,
+		libraryHandler:            libraryHandler,
+		bookHandler:               bookHdlr,
+		storageHandler:            storage.NewHandler(db, cfg.DataDir, logger),
+		readerHandler:             readerHdlr,
+		notebookHandler:           notebookHdlr,
+		shelfHandler:              shelfHdlr,
+		dashboardHandler:          dashboardHdlr,
+		metadataHandler:           metadataHdlr,
+		opdsHandler:               opdsHdlr,
+		koboHandler:               koboHdlr,
+		koreaderHandler:           koreaderHdlr,
+		recommendationHandler:     recHdlr,
+		auditHandler:              audit.NewHandler(db, auditSvc, logger),
+		contentRestrictionHandler: contentRestrictionHdlr,
+		hub:                       hub,
+		wsHandler:                 wsHandler,
+		watcher:                   watcher,
+		taskRunner:                taskRunner,
+		taskScheduler:             taskScheduler,
+		taskHandler:               taskHandler,
 	}
 
 	if err := s.ensureDefaultAdmin(); err != nil {

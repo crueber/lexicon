@@ -12,13 +12,15 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/crueber/lexicon/internal/auth"
+	"github.com/crueber/lexicon/internal/contentrestriction"
 	"github.com/crueber/lexicon/internal/user"
 )
 
 // Handler handles HTTP requests for the dashboard.
 type Handler struct {
-	db     *sql.DB
-	logger *slog.Logger
+	db                    *sql.DB
+	logger                *slog.Logger
+	contentRestrictionSvc *contentrestriction.Service
 }
 
 // NewHandler creates a new dashboard Handler.
@@ -27,6 +29,11 @@ func NewHandler(db *sql.DB, logger *slog.Logger) *Handler {
 		db:     db,
 		logger: logger,
 	}
+}
+
+// WithContentRestrictionService sets the content restriction service for filtering dashboard books.
+func (h *Handler) WithContentRestrictionService(svc *contentrestriction.Service) {
+	h.contentRestrictionSvc = svc
 }
 
 // Routes registers all dashboard routes on the given router.
@@ -209,6 +216,11 @@ func (h *Handler) handleGet(w http.ResponseWriter, r *http.Request) {
 			books = []dashboardBook{}
 		}
 
+		// Apply content restrictions.
+		if h.contentRestrictionSvc != nil && principal != nil {
+			books = h.filterDashboardBooks(ctx, principal, books)
+		}
+
 		dashRows = append(dashRows, dashboardRow{
 			Type:  cfg.Type,
 			Title: cfg.Title,
@@ -228,6 +240,33 @@ func (h *Handler) handleGet(w http.ResponseWriter, r *http.Request) {
 		Rows:  dashRows,
 		Stats: stats,
 	})
+}
+
+// filterDashboardBooks applies content restrictions to a slice of dashboard books.
+func (h *Handler) filterDashboardBooks(ctx context.Context, principal *auth.Principal, books []dashboardBook) []dashboardBook {
+	if principal.IsAdmin() || len(books) == 0 {
+		return books
+	}
+	bookIDs := make([]int64, len(books))
+	for i, b := range books {
+		bookIDs[i] = b.ID
+	}
+	filteredIDs, err := h.contentRestrictionSvc.FilterBookIDs(ctx, principal.UserID, principal.IsAdmin(), bookIDs)
+	if err != nil {
+		h.logger.Error("filter dashboard books", "error", err)
+		return books
+	}
+	idSet := make(map[int64]struct{}, len(filteredIDs))
+	for _, id := range filteredIDs {
+		idSet[id] = struct{}{}
+	}
+	var filtered []dashboardBook
+	for _, b := range books {
+		if _, ok := idSet[b.ID]; ok {
+			filtered = append(filtered, b)
+		}
+	}
+	return filtered
 }
 
 // fetchRecentlyAdded returns the most recently added books across the given libraries.

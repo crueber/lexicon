@@ -357,6 +357,14 @@ type UserBookFileProgress struct {
 	UpdatedAt    string         `json:"updated_at"`
 }
 
+type UserContentRestriction struct {
+	ID              int64  `json:"id"`
+	UserID          int64  `json:"user_id"`
+	RestrictionType string `json:"restriction_type"`
+	Value           string `json:"value"`
+	Mode            string `json:"mode"`
+}
+
 type UserLibraryPermission struct {
 	UserID    int64 `json:"user_id"`
 	LibraryID int64 `json:"library_id"`

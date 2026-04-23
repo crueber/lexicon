@@ -409,6 +409,31 @@ func (h *Handler) handleMagicBooks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Apply content restrictions.
+	if h.contentRestrictionSvc != nil && principal != nil {
+		bookIDs := make([]int64, len(books))
+		for i, b := range books {
+			bookIDs[i] = b.ID
+		}
+		filteredIDs, filterErr := h.contentRestrictionSvc.FilterBookIDs(r.Context(), principal.UserID, principal.IsAdmin(), bookIDs)
+		if filterErr != nil {
+			h.logger.Error("filter magic shelf books", "error", filterErr)
+			// Non-fatal: continue without filtering.
+		} else {
+			idSet := make(map[int64]struct{}, len(filteredIDs))
+			for _, id := range filteredIDs {
+				idSet[id] = struct{}{}
+			}
+			var filtered []BookResult
+			for _, b := range books {
+				if _, ok := idSet[b.ID]; ok {
+					filtered = append(filtered, b)
+				}
+			}
+			books = filtered
+		}
+	}
+
 	resp := make([]MagicShelfBookResponse, 0, len(books))
 	for _, b := range books {
 		br := MagicShelfBookResponse{
@@ -474,6 +499,27 @@ func (h *Handler) handleMagicCount(w http.ResponseWriter, r *http.Request) {
 		h.logger.Error("count magic shelf", "id", id, "error", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
+	}
+
+	// Apply content restrictions to count.
+	if h.contentRestrictionSvc != nil && principal != nil && !principal.IsAdmin() && count > 0 {
+		// We need to get the actual book IDs to filter the count.
+		// EvaluateMagicShelf returns the books; filter them and count.
+		books, evalErr := EvaluateMagicShelf(r.Context(), h.svc.db, ms, libraryIDs)
+		if evalErr != nil {
+			h.logger.Error("evaluate magic shelf for count filter", "id", id, "error", evalErr)
+		} else {
+			bookIDs := make([]int64, len(books))
+			for i, b := range books {
+				bookIDs[i] = b.ID
+			}
+			filteredIDs, filterErr := h.contentRestrictionSvc.FilterBookIDs(r.Context(), principal.UserID, principal.IsAdmin(), bookIDs)
+			if filterErr != nil {
+				h.logger.Error("filter magic shelf count", "error", filterErr)
+			} else {
+				count = int64(len(filteredIDs))
+			}
+		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]int64{"count": count})

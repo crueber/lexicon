@@ -13,13 +13,15 @@ import (
 
 	"github.com/crueber/lexicon/internal/audit"
 	"github.com/crueber/lexicon/internal/auth"
+	"github.com/crueber/lexicon/internal/contentrestriction"
 )
 
 // Handler handles HTTP requests for shelf management.
 type Handler struct {
-	svc      *Service
-	logger   *slog.Logger
-	auditSvc *audit.Service
+	svc                   *Service
+	logger                *slog.Logger
+	auditSvc              *audit.Service
+	contentRestrictionSvc *contentrestriction.Service
 }
 
 // NewHandler creates a new shelf Handler.
@@ -33,6 +35,11 @@ func NewHandler(svc *Service, logger *slog.Logger) *Handler {
 // WithAuditService sets the audit service for logging shelf events.
 func (h *Handler) WithAuditService(svc *audit.Service) {
 	h.auditSvc = svc
+}
+
+// WithContentRestrictionService sets the content restriction service for filtering shelf books.
+func (h *Handler) WithContentRestrictionService(svc *contentrestriction.Service) {
+	h.contentRestrictionSvc = svc
 }
 
 // Routes registers all shelf routes on the given router.
@@ -339,6 +346,31 @@ func (h *Handler) handleListBooks(w http.ResponseWriter, r *http.Request) {
 		h.logger.Error("list books in shelf", "shelf_id", id, "error", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
+	}
+
+	// Apply content restrictions.
+	if h.contentRestrictionSvc != nil && principal != nil {
+		bookIDs := make([]int64, len(books))
+		for i, b := range books {
+			bookIDs[i] = b.ID
+		}
+		filteredIDs, filterErr := h.contentRestrictionSvc.FilterBookIDs(r.Context(), principal.UserID, principal.IsAdmin(), bookIDs)
+		if filterErr != nil {
+			h.logger.Error("filter shelf books", "error", filterErr)
+			// Non-fatal: continue without filtering.
+		} else {
+			idSet := make(map[int64]struct{}, len(filteredIDs))
+			for _, id := range filteredIDs {
+				idSet[id] = struct{}{}
+			}
+			var filtered []ListBooksInShelfRow
+			for _, b := range books {
+				if _, ok := idSet[b.ID]; ok {
+					filtered = append(filtered, b)
+				}
+			}
+			books = filtered
+		}
 	}
 
 	resp := make([]ShelfBookResponse, 0, len(books))

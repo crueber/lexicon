@@ -110,3 +110,12 @@ sql:
         out: "internal/audit"
         emit_json_tags: true
         emit_empty_slices: true
+  - engine: "sqlite"
+    queries: "internal/contentrestriction/queries.sql"
+    schema: "migrations/"
+    gen:
+      go:
+        package: "contentrestriction"
+        out: "internal/contentrestriction"
+        emit_json_tags: true
+        emit_empty_slices: true

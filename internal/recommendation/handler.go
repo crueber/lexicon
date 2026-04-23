@@ -7,13 +7,15 @@ import (
 	"strconv"
 
 	"github.com/crueber/lexicon/internal/auth"
+	"github.com/crueber/lexicon/internal/contentrestriction"
 	"github.com/go-chi/chi/v5"
 )
 
 // Handler handles HTTP requests for book recommendations.
 type Handler struct {
-	service *Service
-	logger  *slog.Logger
+	service               *Service
+	logger                *slog.Logger
+	contentRestrictionSvc *contentrestriction.Service
 }
 
 // NewHandler creates a new recommendation Handler.
@@ -22,6 +24,11 @@ func NewHandler(service *Service, logger *slog.Logger) *Handler {
 		service: service,
 		logger:  logger,
 	}
+}
+
+// WithContentRestrictionService sets the content restriction service for filtering recommendations.
+func (h *Handler) WithContentRestrictionService(svc *contentrestriction.Service) {
+	h.contentRestrictionSvc = svc
 }
 
 // HandleSimilarBooks handles GET /api/books/{id}/similar.
@@ -53,6 +60,33 @@ func (h *Handler) HandleSimilarBooks(w http.ResponseWriter, r *http.Request) {
 		h.logger.Error("find similar books", "book_id", bookID, "error", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
+	}
+
+	// Apply content restrictions.
+	if h.contentRestrictionSvc != nil {
+		if p := auth.PrincipalFromContext(r.Context()); p != nil && !p.IsAdmin() {
+			bookIDs := make([]int64, len(books))
+			for i, b := range books {
+				bookIDs[i] = b.ID
+			}
+			filteredIDs, filterErr := h.contentRestrictionSvc.FilterBookIDs(r.Context(), p.UserID, p.IsAdmin(), bookIDs)
+			if filterErr != nil {
+				h.logger.Error("filter similar books", "error", filterErr)
+				// Non-fatal: continue without filtering.
+			} else {
+				idSet := make(map[int64]struct{}, len(filteredIDs))
+				for _, id := range filteredIDs {
+					idSet[id] = struct{}{}
+				}
+				var filtered []SimilarBook
+				for _, b := range books {
+					if _, ok := idSet[b.ID]; ok {
+						filtered = append(filtered, b)
+					}
+				}
+				books = filtered
+			}
+		}
 	}
 
 	writeJSON(w, http.StatusOK, books)

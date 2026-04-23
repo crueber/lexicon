@@ -86,6 +86,15 @@ func (s *Server) setupRoutes() {
 			s.userHandler.SelfRoutes(r)
 		})
 
+		// Content restriction routes (require auth).
+		r.Route("/users/me/content-restrictions", func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			r.Get("/", s.contentRestrictionHandler.HandleList)
+			r.Post("/", s.contentRestrictionHandler.HandleCreate)
+			r.Put("/{id}", s.contentRestrictionHandler.HandleUpdate)
+			r.Delete("/{id}", s.contentRestrictionHandler.HandleDelete)
+		})
+
 		// Reader routes (require auth).
 		r.Route("/reader", func(r chi.Router) {
 			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
