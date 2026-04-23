@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"runtime/debug"
 	"time"
+
+	"github.com/crueber/lexicon/internal/auth"
 )
 
 // setupMiddleware registers all global middleware on the router.
@@ -12,6 +14,7 @@ func (s *Server) setupMiddleware() {
 	s.router.Use(s.recoverer)
 	s.router.Use(s.requestLogger)
 	s.router.Use(s.cors)
+	s.router.Use(auth.RemoteAuthMiddleware(s.db, s.remoteAuthCfg, s.auditSvc, s.logger))
 }
 
 // recoverer catches panics in HTTP handlers and returns a 500 response.

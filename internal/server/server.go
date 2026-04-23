@@ -71,11 +71,15 @@ type Server struct {
 	taskRunner                *task.Runner
 	taskScheduler             *task.Scheduler
 	taskHandler               *task.Handler
+	oidcHandler               *auth.OIDCHandler
+	remoteAuthCfg             auth.RemoteAuthConfig
+	auditSvc                  *audit.Service
 }
 
 // New creates a new Server with the given configuration, opens the database,
 // runs migrations, and sets up the router and middleware.
 func New(cfg Config) (*Server, error) {
+	ctx := context.Background()
 	logger := newLogger(cfg.LogLevel, cfg.LogFormat)
 
 	db, err := OpenDatabase(cfg.DataDir)
@@ -252,6 +256,69 @@ func New(cfg Config) (*Server, error) {
 	appsettingsHdlr := appsettings.NewHandler(appsettingsSvc, logger)
 	appsettingsHdlr.WithAuditService(auditSvc)
 
+	// Load OIDC and remote auth configs from app_settings (env vars are fallback).
+	oidcCfg := auth.OIDCConfig{
+		Enabled:      cfg.OIDCEnabled,
+		ProviderName: cfg.OIDCProviderName,
+		ClientID:     cfg.OIDCClientID,
+		ClientSecret: cfg.OIDCClientSecret,
+		IssuerURI:    cfg.OIDCIssuerURI,
+		Scopes:       cfg.OIDCScope,
+	}
+	remoteAuthCfg := auth.RemoteAuthConfig{
+		Enabled:      cfg.RemoteAuthEnabled,
+		UserHeader:   cfg.RemoteAuthUserHeader,
+		EmailHeader:  cfg.RemoteAuthEmailHeader,
+		GroupsHeader: cfg.RemoteAuthGroupsHeader,
+		AutoCreate:   cfg.RemoteAuthAutoCreate,
+	}
+
+	// Override with app_settings if present.
+	if settings, err := appsettingsSvc.ListSettings(ctx); err == nil {
+		if v, ok := settings["oidc_enabled"]; ok {
+			oidcCfg.Enabled = v == "true" || v == "1"
+		}
+		if v, ok := settings["oidc_provider_name"]; ok {
+			oidcCfg.ProviderName = v
+		}
+		if v, ok := settings["oidc_client_id"]; ok {
+			oidcCfg.ClientID = v
+		}
+		if v, ok := settings["oidc_client_secret"]; ok {
+			oidcCfg.ClientSecret = v
+		}
+		if v, ok := settings["oidc_issuer_uri"]; ok {
+			oidcCfg.IssuerURI = v
+		}
+		if v, ok := settings["oidc_scopes"]; ok {
+			oidcCfg.Scopes = v
+		}
+		if v, ok := settings["remote_auth_enabled"]; ok {
+			remoteAuthCfg.Enabled = v == "true" || v == "1"
+		}
+		if v, ok := settings["remote_auth_user_header"]; ok {
+			remoteAuthCfg.UserHeader = v
+		}
+		if v, ok := settings["remote_auth_email_header"]; ok {
+			remoteAuthCfg.EmailHeader = v
+		}
+		if v, ok := settings["remote_auth_groups_header"]; ok {
+			remoteAuthCfg.GroupsHeader = v
+		}
+		if v, ok := settings["remote_auth_auto_create"]; ok {
+			remoteAuthCfg.AutoCreate = v == "true" || v == "1"
+		}
+	} else {
+		logger.Warn("failed to load app settings for auth config", "error", err)
+	}
+
+	oidcSvc, err := auth.NewOIDCService(db, oidcCfg)
+	if err != nil {
+		logger.Warn("failed to create oidc service", "error", err)
+	}
+	oidcHdlr := auth.NewOIDCHandler(db, cfg.JWTSecret, logger, oidcSvc)
+	oidcHdlr.WithAuditService(auditSvc)
+
 	bookdropSvc := bookdrop.NewService(db, libraryScanner, logger)
 	bookdropHdlr := bookdrop.NewHandler(bookdropSvc, db, logger)
 	bookdropHdlr.WithAuditService(auditSvc)
@@ -292,6 +359,9 @@ func New(cfg Config) (*Server, error) {
 		taskRunner:                taskRunner,
 		taskScheduler:             taskScheduler,
 		taskHandler:               taskHandler,
+		oidcHandler:               oidcHdlr,
+		remoteAuthCfg:             remoteAuthCfg,
+		auditSvc:                  auditSvc,
 	}
 
 	if err := s.ensureDefaultAdmin(); err != nil {

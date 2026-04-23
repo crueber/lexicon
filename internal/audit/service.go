@@ -31,6 +31,8 @@ const (
 	ActionKoboSync            = "KOBO_SYNC"
 	ActionKOReaderSync        = "KOREADER_SYNC"
 	ActionAdminAction         = "ADMIN_ACTION"
+	ActionOIDCUserCreated     = "OIDC_USER_CREATED"
+	ActionRemoteAuthLogin     = "REMOTE_AUTH_LOGIN"
 )
 
 // LogParams contains all fields for an audit log entry.

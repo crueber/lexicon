@@ -28,6 +28,13 @@ func (s *Server) setupRoutes() {
 			r.Post("/refresh", s.authHandler.HandleRefresh)
 			r.Post("/logout", s.authHandler.HandleLogout)
 
+			// OIDC routes (public).
+			r.Route("/oidc", func(r chi.Router) {
+				r.Get("/providers", s.oidcHandler.HandleProviders)
+				r.Get("/{provider}/authorize", s.oidcHandler.HandleAuthorize)
+				r.Get("/callback", s.oidcHandler.HandleCallback)
+			})
+
 			// Protected auth routes.
 			r.Group(func(r chi.Router) {
 				r.Use(auth.RequireAuth(s.cfg.JWTSecret))

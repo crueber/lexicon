@@ -326,6 +326,22 @@ type Mood struct {
 	Name string `json:"name"`
 }
 
+type OidcGroupMapping struct {
+	ID            int64  `json:"id"`
+	GroupName     string `json:"group_name"`
+	PermissionBit string `json:"permission_bit"`
+	CreatedAt     string `json:"created_at"`
+}
+
+type OidcSession struct {
+	ID          int64          `json:"id"`
+	State       string         `json:"state"`
+	Nonce       string         `json:"nonce"`
+	RedirectUrl sql.NullString `json:"redirect_url"`
+	UserID      sql.NullInt64  `json:"user_id"`
+	CreatedAt   string         `json:"created_at"`
+}
+
 type ReadingSession struct {
 	ID            int64          `json:"id"`
 	UserID        int64          `json:"user_id"`
