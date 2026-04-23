@@ -109,6 +109,23 @@ func (q *Queries) DeleteBookFile(ctx context.Context, id int64) error {
 	return err
 }
 
+const dismissDuplicate = `-- name: DismissDuplicate :exec
+INSERT INTO duplicate_dismiss (book_id_a, book_id_b, dismissed_by)
+VALUES (?, ?, ?)
+ON CONFLICT(book_id_a, book_id_b) DO NOTHING
+`
+
+type DismissDuplicateParams struct {
+	BookIDA     int64         `json:"book_id_a"`
+	BookIDB     int64         `json:"book_id_b"`
+	DismissedBy sql.NullInt64 `json:"dismissed_by"`
+}
+
+func (q *Queries) DismissDuplicate(ctx context.Context, arg DismissDuplicateParams) error {
+	_, err := q.db.ExecContext(ctx, dismissDuplicate, arg.BookIDA, arg.BookIDB, arg.DismissedBy)
+	return err
+}
+
 const getBookByFolderPath = `-- name: GetBookByFolderPath :one
 SELECT id, library_id, folder_path, book_type, created_at, added_date FROM book WHERE library_id = ? AND folder_path = ? LIMIT 1
 `
@@ -656,6 +673,69 @@ func (q *Queries) ListBooksByLibrary(ctx context.Context, libraryID int64) ([]Bo
 	return items, nil
 }
 
+const listBooksWithFilesAndMetadata = `-- name: ListBooksWithFilesAndMetadata :many
+SELECT
+    b.id as book_id,
+    bm.title,
+    GROUP_CONCAT(a.name, '|') as author_names,
+    s.name as series_name,
+    bs.series_number as series_number,
+    bf.id as file_id,
+    bf.file_path,
+    (SELECT path FROM library_path WHERE library_id = b.library_id LIMIT 1) as library_path
+FROM book b
+LEFT JOIN book_metadata bm ON b.id = bm.book_id
+LEFT JOIN book_author ba ON b.id = ba.book_id
+LEFT JOIN author a ON ba.author_id = a.id
+LEFT JOIN book_series bs ON b.id = bs.book_id
+LEFT JOIN series s ON bs.series_id = s.id
+LEFT JOIN book_file bf ON b.id = bf.book_id
+GROUP BY b.id, bf.id
+`
+
+type ListBooksWithFilesAndMetadataRow struct {
+	BookID       int64           `json:"book_id"`
+	Title        sql.NullString  `json:"title"`
+	AuthorNames  string          `json:"author_names"`
+	SeriesName   sql.NullString  `json:"series_name"`
+	SeriesNumber sql.NullFloat64 `json:"series_number"`
+	FileID       sql.NullInt64   `json:"file_id"`
+	FilePath     sql.NullString  `json:"file_path"`
+	LibraryPath  string          `json:"library_path"`
+}
+
+func (q *Queries) ListBooksWithFilesAndMetadata(ctx context.Context) ([]ListBooksWithFilesAndMetadataRow, error) {
+	rows, err := q.db.QueryContext(ctx, listBooksWithFilesAndMetadata)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBooksWithFilesAndMetadataRow{}
+	for rows.Next() {
+		var i ListBooksWithFilesAndMetadataRow
+		if err := rows.Scan(
+			&i.BookID,
+			&i.Title,
+			&i.AuthorNames,
+			&i.SeriesName,
+			&i.SeriesNumber,
+			&i.FileID,
+			&i.FilePath,
+			&i.LibraryPath,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listBooksWithMetadata = `-- name: ListBooksWithMetadata :many
 SELECT b.id, b.library_id, b.book_type, b.added_date,
        bm.title, bm.cover_path
@@ -698,6 +778,85 @@ func (q *Queries) ListBooksWithMetadata(ctx context.Context, arg ListBooksWithMe
 			&i.Title,
 			&i.CoverPath,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listBooksWithMetadataAndAuthors = `-- name: ListBooksWithMetadataAndAuthors :many
+SELECT b.id, bm.title, bm.isbn_10, bm.isbn_13,
+       GROUP_CONCAT(a.name, '|') as author_names
+FROM book b
+LEFT JOIN book_metadata bm ON b.id = bm.book_id
+LEFT JOIN book_author ba ON b.id = ba.book_id
+LEFT JOIN author a ON ba.author_id = a.id
+GROUP BY b.id
+`
+
+type ListBooksWithMetadataAndAuthorsRow struct {
+	ID          int64          `json:"id"`
+	Title       sql.NullString `json:"title"`
+	Isbn10      sql.NullString `json:"isbn_10"`
+	Isbn13      sql.NullString `json:"isbn_13"`
+	AuthorNames string         `json:"author_names"`
+}
+
+func (q *Queries) ListBooksWithMetadataAndAuthors(ctx context.Context) ([]ListBooksWithMetadataAndAuthorsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listBooksWithMetadataAndAuthors)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBooksWithMetadataAndAuthorsRow{}
+	for rows.Next() {
+		var i ListBooksWithMetadataAndAuthorsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Isbn10,
+			&i.Isbn13,
+			&i.AuthorNames,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDismissedDuplicates = `-- name: ListDismissedDuplicates :many
+SELECT book_id_a, book_id_b FROM duplicate_dismiss
+`
+
+type ListDismissedDuplicatesRow struct {
+	BookIDA int64 `json:"book_id_a"`
+	BookIDB int64 `json:"book_id_b"`
+}
+
+func (q *Queries) ListDismissedDuplicates(ctx context.Context) ([]ListDismissedDuplicatesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listDismissedDuplicates)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDismissedDuplicatesRow{}
+	for rows.Next() {
+		var i ListDismissedDuplicatesRow
+		if err := rows.Scan(&i.BookIDA, &i.BookIDB); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

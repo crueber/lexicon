@@ -19,6 +19,7 @@ import (
 	"github.com/crueber/lexicon/internal/book"
 	"github.com/crueber/lexicon/internal/contentrestriction"
 	"github.com/crueber/lexicon/internal/dashboard"
+	"github.com/crueber/lexicon/internal/hardcover"
 	"github.com/crueber/lexicon/internal/kobo"
 	"github.com/crueber/lexicon/internal/koreader"
 	"github.com/crueber/lexicon/internal/library"
@@ -56,6 +57,7 @@ type Server struct {
 	recommendationHandler     *recommendation.Handler
 	auditHandler              *audit.Handler
 	contentRestrictionHandler *contentrestriction.Handler
+	hardcoverHandler          *hardcover.Handler
 	hub                       *ws.Hub
 	wsHandler                 *ws.Handler
 	watcher                   *library.Watcher
@@ -103,6 +105,12 @@ func New(cfg Config) (*Server, error) {
 	taskRunner.Register(task.TypeAuditLogCleanup, func(ctx context.Context, _ string, _ task.Reporter) error {
 		return auditSvc.Cleanup(ctx, 365)
 	})
+
+	// Register duplicate detection task.
+	taskRunner.Register(task.TypeDuplicateDetection, task.NewDuplicateDetectionFunc(db, logger))
+
+	// Register file organization task.
+	taskRunner.Register(task.TypeFileOrganization, task.NewFileOrganizationFunc(db, logger))
 
 	// Set up the content restriction service.
 	contentRestrictionSvc := contentrestriction.NewService(db, logger)
@@ -213,6 +221,9 @@ func New(cfg Config) (*Server, error) {
 
 	contentRestrictionHdlr := contentrestriction.NewHandler(contentRestrictionSvc, logger)
 
+	hardcoverSvc := hardcover.NewService(db, logger)
+	hardcoverHdlr := hardcover.NewHandler(hardcoverSvc)
+
 	s := &Server{
 		cfg:                       cfg,
 		db:                        db,
@@ -234,6 +245,7 @@ func New(cfg Config) (*Server, error) {
 		recommendationHandler:     recHdlr,
 		auditHandler:              audit.NewHandler(db, auditSvc, logger),
 		contentRestrictionHandler: contentRestrictionHdlr,
+		hardcoverHandler:          hardcoverHdlr,
 		hub:                       hub,
 		wsHandler:                 wsHandler,
 		watcher:                   watcher,

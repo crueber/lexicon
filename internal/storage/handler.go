@@ -16,18 +16,21 @@ import (
 
 // Handler serves cover images for books.
 type Handler struct {
-	db      *sql.DB
-	dataDir string
-	logger  *slog.Logger
+	db       *sql.DB
+	dataDir  string
+	logger   *slog.Logger
+	fontSvc  *FontService
 }
 
 // NewHandler creates a new storage Handler.
 func NewHandler(db *sql.DB, dataDir string, logger *slog.Logger) *Handler {
-	return &Handler{
+	h := &Handler{
 		db:      db,
 		dataDir: dataDir,
 		logger:  logger,
 	}
+	h.fontSvc = NewFontService(db, dataDir, logger)
+	return h
 }
 
 // Routes registers cover serving routes.

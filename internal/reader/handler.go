@@ -332,6 +332,39 @@ func (h *Handler) handlePutProgress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// After upserting progress, update or create a reading session.
+	// Look for an existing session for this user/book from the last 30 minutes.
+	var sessionID int64
+	err = h.db.QueryRowContext(ctx,
+		`SELECT id FROM reading_sessions
+		 WHERE user_id = ? AND book_id = ? AND ended_at > datetime('now', '-30 minutes')
+		 ORDER BY ended_at DESC LIMIT 1`,
+		principal.UserID, bookID).Scan(&sessionID)
+
+	if err == sql.ErrNoRows {
+		// No recent session; create a new one.
+		_, err = h.db.ExecContext(ctx,
+			`INSERT INTO reading_sessions (user_id, book_id, book_file_id, start_progress, end_progress, started_at, ended_at, duration_secs)
+			 VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), 0)`,
+			principal.UserID, bookID, req.FileID, req.Progress, req.Progress)
+		if err != nil {
+			h.logger.Warn("record reading session", "user_id", principal.UserID, "book_id", bookID, "error", err)
+		}
+	} else if err == nil {
+		// Update existing session: extend ended_at and add 60 seconds of reading time.
+		// Using a fixed 60-second increment per progress save is a simple heuristic.
+		_, err = h.db.ExecContext(ctx,
+			`UPDATE reading_sessions
+			 SET ended_at = datetime('now'), end_progress = ?, duration_secs = duration_secs + 60
+			 WHERE id = ?`,
+			req.Progress, sessionID)
+		if err != nil {
+			h.logger.Warn("update reading session", "session_id", sessionID, "error", err)
+		}
+	} else {
+		h.logger.Warn("query reading session", "user_id", principal.UserID, "book_id", bookID, "error", err)
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 

@@ -162,6 +162,30 @@ type ComicMetadatum struct {
 	CommunityRating sql.NullFloat64 `json:"community_rating"`
 }
 
+type CustomFont struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	FilePath  string `json:"file_path"`
+	Format    string `json:"format"`
+	CreatedAt string `json:"created_at"`
+}
+
+type DuplicateDismiss struct {
+	ID          int64         `json:"id"`
+	BookIDA     int64         `json:"book_id_a"`
+	BookIDB     int64         `json:"book_id_b"`
+	DismissedBy sql.NullInt64 `json:"dismissed_by"`
+	CreatedAt   string        `json:"created_at"`
+}
+
+type HardcoverSync struct {
+	ID        int64  `json:"id"`
+	UserID    int64  `json:"user_id"`
+	ApiKey    string `json:"api_key"`
+	Enabled   int64  `json:"enabled"`
+	CreatedAt string `json:"created_at"`
+}
+
 type KoboDevice struct {
 	ID         int64          `json:"id"`
 	UserID     int64          `json:"user_id"`

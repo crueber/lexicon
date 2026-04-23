@@ -2,6 +2,7 @@ import {
   type Component,
   createSignal,
   createEffect,
+  createResource,
   onMount,
   onCleanup,
   Show,
@@ -27,7 +28,7 @@ import { t } from "../../shared/i18n/i18n";
 // ---- Types ----
 
 interface EpubReaderSettings {
-  fontFamily?: "serif" | "sans-serif" | "monospace";
+  fontFamily?: string;
   fontSize?: number;
   lineHeight?: number;
   margins?: "small" | "medium" | "large";
@@ -266,6 +267,11 @@ const EpubReader: Component = () => {
   // Reader settings.
   const [settings, setSettings] = createSignal<EpubReaderSettings>(defaultSettings);
 
+  // Custom fonts.
+  const [fonts] = createResource(() =>
+    fetch("/api/fonts").then((r) => r.json()).catch(() => []),
+  );
+
   // epubjs instances — stored in a plain object to avoid reactivity wrapping.
   const epub: { book: any; rendition: any } = { book: null, rendition: null };
 
@@ -296,12 +302,24 @@ const EpubReader: Component = () => {
 
     const theme = themeStyles[s.theme ?? "dark"];
     const margin = marginSizes[s.margins ?? "medium"];
-    const fontFamily =
+    let fontFamily =
       s.fontFamily === "serif"
         ? "Georgia, 'Times New Roman', serif"
         : s.fontFamily === "monospace"
           ? "'Courier New', Courier, monospace"
-          : "system-ui, -apple-system, sans-serif";
+          : "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+
+    let customFontCSS = "";
+    if (s.fontFamily?.startsWith("custom-")) {
+      const fontId = s.fontFamily.replace("custom-", "");
+      fontFamily = `"CustomFont${fontId}", serif`;
+      customFontCSS = `
+        @font-face {
+          font-family: "CustomFont${fontId}";
+          src: url("/api/fonts/${fontId}/file");
+        }
+      `;
+    }
 
     epub.rendition.themes.default({
       body: {
@@ -315,6 +333,22 @@ const EpubReader: Component = () => {
       },
       a: { color: "inherit" },
     });
+
+    // Inject or update custom font CSS in visible content documents.
+    if (epub.rendition.getContents) {
+      const contents = epub.rendition.getContents();
+      for (const content of contents) {
+        const doc = content.document;
+        if (!doc) continue;
+        let style = doc.getElementById("lexicon-custom-font");
+        if (!style) {
+          style = doc.createElement("style");
+          style.id = "lexicon-custom-font";
+          doc.head.appendChild(style);
+        }
+        style.textContent = customFontCSS;
+      }
+    }
 
     epub.rendition.themes.select("default");
   }
@@ -383,6 +417,25 @@ const EpubReader: Component = () => {
         height: "100%",
         flow: mergedSettings.flow ?? "paginated",
         spread: "none",
+      });
+
+      // Register hook to inject custom font CSS into new content documents.
+      epub.book.hooks.content.register((contents: any) => {
+        const s = settings();
+        if (s.fontFamily?.startsWith("custom-")) {
+          const fontId = s.fontFamily.replace("custom-", "");
+          const css = `
+            @font-face {
+              font-family: "CustomFont${fontId}";
+              src: url("/api/fonts/${fontId}/file");
+            }
+          `;
+          const doc = contents.document;
+          const style = doc.createElement("style");
+          style.id = "lexicon-custom-font";
+          style.textContent = css;
+          doc.head.appendChild(style);
+        }
       });
 
       // Apply initial theme/settings.
@@ -939,6 +992,23 @@ const EpubReader: Component = () => {
                   </button>
                 )}
               </For>
+              <Show when={fonts() && fonts().length > 0}>
+                <div class="my-1 border-t border-slate-700/50" />
+                <For each={fonts()}>
+                  {(font: { id: number; name: string; format: string }) => (
+                    <button
+                      onClick={() => updateSetting("fontFamily", `custom-${font.id}`)}
+                      class={`rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                        settings().fontFamily === `custom-${font.id}`
+                          ? "bg-indigo-600/30 text-indigo-300"
+                          : "text-slate-400 hover:bg-white/10 hover:text-slate-200"
+                      }`}
+                    >
+                      {font.name}
+                    </button>
+                  )}
+                </For>
+              </Show>
             </div>
           </div>
 

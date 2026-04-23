@@ -1,0 +1,18 @@
+services:
+  lexicon:
+    image: ghcr.io/crueber/lexicon:latest
+    ports:
+      - "6060:6060"
+    environment:
+      JWT_SECRET: changeme-use-a-long-random-string
+      TZ: America/New_York
+      USER_ID: "1000"
+      GROUP_ID: "1000"
+    volumes:
+      - lexicon-data:/app/data
+      - /path/to/your/books:/books:ro
+      - /path/to/bookdrop:/bookdrop
+    restart: unless-stopped
+
+volumes:
+  lexicon-data:

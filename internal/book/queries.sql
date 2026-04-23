@@ -132,3 +132,39 @@ WHERE b.id = ? LIMIT 1;
 
 -- name: GetBookWithLibraryID :one
 SELECT b.id, b.library_id FROM book b WHERE b.id = ? LIMIT 1;
+
+-- name: ListBooksWithMetadataAndAuthors :many
+SELECT b.id, bm.title, bm.isbn_10, bm.isbn_13,
+       GROUP_CONCAT(a.name, '|') as author_names
+FROM book b
+LEFT JOIN book_metadata bm ON b.id = bm.book_id
+LEFT JOIN book_author ba ON b.id = ba.book_id
+LEFT JOIN author a ON ba.author_id = a.id
+GROUP BY b.id;
+
+-- name: DismissDuplicate :exec
+INSERT INTO duplicate_dismiss (book_id_a, book_id_b, dismissed_by)
+VALUES (?, ?, ?)
+ON CONFLICT(book_id_a, book_id_b) DO NOTHING;
+
+-- name: ListBooksWithFilesAndMetadata :many
+SELECT
+    b.id as book_id,
+    bm.title,
+    GROUP_CONCAT(a.name, '|') as author_names,
+    s.name as series_name,
+    bs.series_number as series_number,
+    bf.id as file_id,
+    bf.file_path,
+    (SELECT path FROM library_path WHERE library_id = b.library_id LIMIT 1) as library_path
+FROM book b
+LEFT JOIN book_metadata bm ON b.id = bm.book_id
+LEFT JOIN book_author ba ON b.id = ba.book_id
+LEFT JOIN author a ON ba.author_id = a.id
+LEFT JOIN book_series bs ON b.id = bs.book_id
+LEFT JOIN series s ON bs.series_id = s.id
+LEFT JOIN book_file bf ON b.id = bf.book_id
+GROUP BY b.id, bf.id;
+
+-- name: ListDismissedDuplicates :many
+SELECT book_id_a, book_id_b FROM duplicate_dismiss;

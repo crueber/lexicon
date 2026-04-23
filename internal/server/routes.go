@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -95,6 +96,22 @@ func (s *Server) setupRoutes() {
 			r.Delete("/{id}", s.contentRestrictionHandler.HandleDelete)
 		})
 
+		// Hardcover sync routes (require auth).
+		r.Route("/users/me/hardcover", func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			r.Get("/", s.hardcoverHandler.HandleGetSettings)
+			r.Put("/", s.hardcoverHandler.HandleSaveSettings)
+		})
+
+		// Font management routes (require auth).
+		r.Route("/fonts", func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			r.Get("/", s.storageHandler.HandleListFonts)
+			r.Post("/", s.storageHandler.HandleUploadFont)
+			r.Delete("/{id}", s.storageHandler.HandleDeleteFont)
+			r.Get("/{id}/file", s.storageHandler.HandleServeFont)
+		})
+
 		// Reader routes (require auth).
 		r.Route("/reader", func(r chi.Router) {
 			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
@@ -165,11 +182,22 @@ func (s *Server) setupRoutes() {
 	}
 }
 
-// handleHealth returns a simple JSON health check response.
-func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
+// handleHealth returns a JSON health check response, including a database ping.
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	// Check database connectivity when a db is available.
+	if s.db != nil {
+		if err := s.db.PingContext(r.Context()); err != nil {
+			s.logger.Error("health check: database ping failed", "error", err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "unhealthy", "reason": "database unreachable"})
+			return
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(`{"status":"ok"}`))
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 // viteProxy returns a reverse proxy to the Vite dev server.

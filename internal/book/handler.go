@@ -60,6 +60,7 @@ func (h *Handler) WithContentRestrictionService(svc *contentrestriction.Service)
 // RequireAuth must already be applied by the caller.
 func (h *Handler) Routes(r chi.Router) {
 	r.Get("/", h.handleList)
+	r.Get("/duplicates", h.handleListDuplicates)
 	r.Get("/{id}", h.handleGet)
 	r.Delete("/{id}", h.handleDelete)
 	r.Get("/{id}/files", h.handleListFiles)
@@ -73,6 +74,39 @@ func (h *Handler) handleListShelves(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.shelfHandler.HandleListShelvesForBook(w, r)
+}
+
+// handleListDuplicates handles GET /api/books/duplicates?preset={preset}.
+func (h *Handler) handleListDuplicates(w http.ResponseWriter, r *http.Request) {
+	principal := auth.PrincipalFromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	if !principal.IsAdmin() {
+		writeError(w, http.StatusForbidden, "admin access required")
+		return
+	}
+
+	preset := DuplicatePreset(r.URL.Query().Get("preset"))
+	if preset == "" {
+		preset = PresetModerate
+	}
+	switch preset {
+	case PresetStrict, PresetModerate, PresetLoose, PresetTitleOnly:
+		// valid
+	default:
+		preset = PresetModerate
+	}
+
+	groups, err := FindDuplicates(r.Context(), h.db, preset)
+	if err != nil {
+		h.logger.Error("find duplicates", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, groups)
 }
 
 // listParams holds the validated parameters for listing books.
