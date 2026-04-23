@@ -23,6 +23,7 @@ import {
   VolumeX,
 } from "lucide-solid";
 import { api, getAccessToken } from "../../shared/api/client";
+import { t } from "../../shared/i18n/i18n";
 import type { BookFile } from "../library/types";
 
 // ---- Types ----
@@ -248,7 +249,7 @@ const AudiobookPlayer: Component = () => {
     if (!("mediaSession" in navigator)) return;
 
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: track.trackTitle ?? track.filePath.split("/").pop() ?? "Track",
+      title: track.trackTitle ?? track.filePath.split("/").pop() ?? t("common.track"),
       artist: authors().join(", "),
       album: bookTitle(),
       artwork: coverPath()
@@ -329,7 +330,7 @@ const AudiobookPlayer: Component = () => {
   onMount(async () => {
     const token = getAccessToken();
     if (!token) {
-      setError("Not authenticated");
+      setError(t("common.notAuthenticated"));
       setLoading(false);
       return;
     }
@@ -372,7 +373,7 @@ const AudiobookPlayer: Component = () => {
         }));
 
       if (audioTracks.length === 0) {
-        setError("No audio files found for this book");
+        setError(t("reader.noAudioFilesFound"));
         setLoading(false);
         return;
       }
@@ -444,7 +445,7 @@ const AudiobookPlayer: Component = () => {
       audioRef.addEventListener("pause", () => setPlaying(false));
 
       audioRef.addEventListener("error", () => {
-        setError("Failed to load audio file");
+        setError(t("reader.failedToLoadAudiobook"));
         setPlaying(false);
       });
 
@@ -464,7 +465,7 @@ const AudiobookPlayer: Component = () => {
       updateMediaSession(audioTracks[startIndex]);
       setLoading(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load audiobook");
+      setError(err instanceof Error ? err.message : t("reader.failedToLoadAudiobook"));
       setLoading(false);
     }
 
@@ -538,7 +539,7 @@ const AudiobookPlayer: Component = () => {
         <div class="absolute inset-0 z-50 flex items-center justify-center bg-slate-950">
           <div class="flex flex-col items-center gap-3 text-slate-400">
             <div class="h-10 w-10 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-400" />
-            <p class="text-sm">Loading audiobook…</p>
+            <p class="text-sm">{t("reader.loadingAudiobook")}</p>
           </div>
         </div>
       </Show>
@@ -552,7 +553,7 @@ const AudiobookPlayer: Component = () => {
               onClick={() => navigate(-1)}
               class="text-sm text-slate-400 hover:text-slate-200 transition-colors"
             >
-              ← Go back
+              {t("common.goBack")}
             </button>
           </div>
         </div>
@@ -568,7 +569,7 @@ const AudiobookPlayer: Component = () => {
           class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
         >
           <ArrowLeft class="h-4 w-4" />
-          <span class="hidden sm:inline">Back</span>
+          <span class="hidden sm:inline">{t("common.back")}</span>
         </button>
 
         <div class="flex min-w-0 flex-1 flex-col items-center px-4">
@@ -591,7 +592,7 @@ const AudiobookPlayer: Component = () => {
               setShowSettings(false);
             }}
             class="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
-            title="Track list"
+            title={t("reader.trackList")}
           >
             <List class="h-4 w-4" />
           </button>
@@ -625,7 +626,7 @@ const AudiobookPlayer: Component = () => {
           </p>
           <Show when={tracks().length > 1}>
             <p class="text-sm text-slate-400">
-              Track {currentTrackIndex() + 1} of {tracks().length}
+              {t("common.track")} {currentTrackIndex() + 1} {t("common.of")} {tracks().length}
             </p>
           </Show>
         </div>
@@ -666,7 +667,7 @@ const AudiobookPlayer: Component = () => {
             onClick={prevTrack}
             disabled={currentTrackIndex() === 0 && currentTime() <= 3}
             class="rounded-full p-2 text-slate-400 hover:text-slate-200 disabled:opacity-30 transition-colors"
-            title="Previous track"
+            title={t("reader.previousTrack")}
           >
             <SkipBack class="h-6 w-6" />
           </button>
@@ -675,7 +676,7 @@ const AudiobookPlayer: Component = () => {
           <button
             onClick={() => seek(-skipInterval())}
             class="flex flex-col items-center rounded-full p-2 text-slate-400 hover:text-slate-200 transition-colors"
-            title={`Back ${skipInterval()}s`}
+            title={`${t("common.back")} ${skipInterval()}s`}
           >
             <ChevronLeft class="h-5 w-5" />
             <span class="text-[10px]">{skipInterval()}s</span>
@@ -685,7 +686,7 @@ const AudiobookPlayer: Component = () => {
           <button
             onClick={togglePlay}
             class="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-500 active:scale-95 transition-all"
-            title={playing() ? "Pause" : "Play"}
+            title={playing() ? t("reader.pause") : t("reader.play")}
           >
             <Show when={playing()} fallback={<Play class="h-7 w-7 translate-x-0.5" />}>
               <Pause class="h-7 w-7" />
@@ -696,7 +697,7 @@ const AudiobookPlayer: Component = () => {
           <button
             onClick={() => seek(skipInterval())}
             class="flex flex-col items-center rounded-full p-2 text-slate-400 hover:text-slate-200 transition-colors"
-            title={`Forward ${skipInterval()}s`}
+            title={`${t("common.next")} ${skipInterval()}s`}
           >
             <ChevronRight class="h-5 w-5" />
             <span class="text-[10px]">{skipInterval()}s</span>
@@ -707,7 +708,7 @@ const AudiobookPlayer: Component = () => {
             onClick={nextTrack}
             disabled={currentTrackIndex() >= tracks().length - 1}
             class="rounded-full p-2 text-slate-400 hover:text-slate-200 disabled:opacity-30 transition-colors"
-            title="Next track"
+            title={t("reader.nextTrack")}
           >
             <SkipForward class="h-6 w-6" />
           </button>
@@ -720,7 +721,7 @@ const AudiobookPlayer: Component = () => {
             <button
               onClick={() => updateSetting("volume", volume() > 0 ? 0 : 1)}
               class="text-slate-400 hover:text-slate-200 transition-colors"
-              title={volume() === 0 ? "Unmute" : "Mute"}
+              title={volume() === 0 ? t("reader.unmute") : t("reader.mute")}
             >
               <Show when={volume() > 0} fallback={<VolumeX class="h-4 w-4" />}>
                 <Volume2 class="h-4 w-4" />
@@ -736,7 +737,7 @@ const AudiobookPlayer: Component = () => {
                 updateSetting("volume", Number(e.currentTarget.value))
               }
               class="flex-1 accent-indigo-400"
-              title="Volume"
+              title={t("reader.volume")}
             />
           </div>
 
@@ -771,7 +772,7 @@ const AudiobookPlayer: Component = () => {
         }}
       >
         <div class="flex items-center justify-between border-b border-white/10 px-4 py-3">
-          <h2 class="text-sm font-semibold text-slate-200">Tracks</h2>
+          <h2 class="text-sm font-semibold text-slate-200">{t("common.tracks")}</h2>
           <button
             onClick={() => setShowTrackList(false)}
             class="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
@@ -783,7 +784,7 @@ const AudiobookPlayer: Component = () => {
           <For
             each={tracks()}
             fallback={
-              <p class="px-2 py-4 text-sm text-slate-500">No tracks found</p>
+              <p class="px-2 py-4 text-sm text-slate-500">{t("reader.noTracksFound")}</p>
             }
           >
             {(track, index) => (
@@ -805,7 +806,7 @@ const AudiobookPlayer: Component = () => {
                   <p class="truncate text-sm">
                     {track.trackTitle ??
                       track.filePath.split("/").pop()?.replace(/\.[^.]+$/, "") ??
-                      `Track ${index() + 1}`}
+                      `${t("common.track")} ${index() + 1}`}
                   </p>
                   <Show when={track.durationSecs}>
                     <p class="text-xs text-slate-500">
@@ -837,7 +838,7 @@ const AudiobookPlayer: Component = () => {
         }}
       >
         <div class="flex items-center justify-between border-b border-white/10 px-4 py-3">
-          <h2 class="text-sm font-semibold text-slate-200">Settings</h2>
+          <h2 class="text-sm font-semibold text-slate-200">{t("common.settingsTitleShort")}</h2>
           <button
             onClick={() => setShowSettings(false)}
             class="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
@@ -850,7 +851,7 @@ const AudiobookPlayer: Component = () => {
           {/* Skip interval */}
           <div class="flex flex-col gap-2">
             <label class="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Skip Interval: {skipInterval()}s
+              {t("reader.skipInterval")}: {skipInterval()}s
             </label>
             <div class="flex gap-2">
               <For each={[10, 15, 30, 45, 60] as const}>

@@ -15,6 +15,7 @@ import { useAuth } from "../auth/AuthProvider";
 import Button from "../../shared/ui/Button";
 import Input from "../../shared/ui/Input";
 import Skeleton from "../../shared/ui/Skeleton";
+import { t } from "../../shared/i18n/i18n";
 import type { Shelf, ShelfBook } from "../library/types";
 
 // ---- API ----
@@ -83,7 +84,7 @@ const ShelfBookCard: Component<{
           >
             <img
               src={`/api/books/${props.book.id}/cover/thumbnail`}
-              alt={props.book.title ?? "Book cover"}
+              alt={props.book.title ?? t("common.bookCover")}
               loading="lazy"
               class="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
               onError={() => setImgError(true)}
@@ -92,7 +93,7 @@ const ShelfBookCard: Component<{
         </div>
         <div class="min-w-0 flex-1">
           <p class="line-clamp-2 text-xs font-medium leading-tight text-slate-100">
-            {props.book.title ?? "Untitled"}
+            {props.book.title ?? t("common.untitled")}
           </p>
         </div>
       </button>
@@ -105,7 +106,7 @@ const ShelfBookCard: Component<{
             props.onRemove();
           }}
           class="absolute right-1.5 top-1.5 hidden rounded-full bg-red-600/90 p-1 text-white transition-colors hover:bg-red-500 group-hover:flex"
-          title="Remove from shelf"
+          title={t("shelf.removeFromShelf")}
         >
           <Minus class="h-3 w-3" />
         </button>
@@ -131,7 +132,7 @@ const EditShelfDialog: Component<{
   async function handleSubmit(e: Event) {
     e.preventDefault();
     if (!name().trim()) {
-      setError("Name is required");
+      setError(t("common.nameRequired"));
       return;
     }
     setSaving(true);
@@ -146,7 +147,7 @@ const EditShelfDialog: Component<{
       });
       props.onSaved();
     } catch {
-      setError("Failed to save changes. Please try again.");
+      setError(t("common.failedToSaveChanges"));
     } finally {
       setSaving(false);
     }
@@ -161,7 +162,7 @@ const EditShelfDialog: Component<{
     >
       <div class="w-full max-w-md rounded-xl bg-slate-800 shadow-2xl">
         <div class="flex items-center justify-between border-b border-slate-700 px-6 py-4">
-          <h2 class="text-lg font-semibold text-slate-100">Edit Shelf</h2>
+          <h2 class="text-lg font-semibold text-slate-100">{t("shelf.editShelf")}</h2>
           <button
             onClick={props.onClose}
             class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
@@ -172,25 +173,25 @@ const EditShelfDialog: Component<{
 
         <form onSubmit={handleSubmit} class="flex flex-col gap-4 p-6">
           <Input
-            label="Name"
+            label={t("common.name")}
             value={name()}
             onInput={(e) => setName(e.currentTarget.value)}
             required
           />
           <Input
-            label="Description (optional)"
+            label={t("common.descriptionOptional")}
             value={description()}
             onInput={(e) => setDescription(e.currentTarget.value)}
           />
           <div class="grid grid-cols-2 gap-4">
             <Input
-              label="Icon (emoji, optional)"
+              label={t("common.iconOptional")}
               placeholder="📚"
               value={icon()}
               onInput={(e) => setIcon(e.currentTarget.value)}
             />
             <Input
-              label="Color (hex, optional)"
+              label={t("common.colorOptional")}
               placeholder="#6366f1"
               value={iconColor()}
               onInput={(e) => setIconColor(e.currentTarget.value)}
@@ -203,10 +204,10 @@ const EditShelfDialog: Component<{
 
           <div class="flex justify-end gap-3 pt-2">
             <Button variant="ghost" type="button" onClick={props.onClose}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button variant="primary" type="submit" loading={saving()}>
-              Save Changes
+              {t("common.saveChanges")}
             </Button>
           </div>
         </form>
@@ -299,7 +300,7 @@ const ShelfDetailInner: Component<{ shelfId: number }> = (props) => {
                 onClick={() => navigate("/shelves")}
                 class="text-sm text-slate-400 hover:text-slate-200 transition-colors"
               >
-                ← Shelves
+                ← {t("common.shelves")}
               </button>
               <div class="flex items-center gap-3">
                 <Show when={s().icon} fallback={<BookMarked class="h-6 w-6 text-indigo-400" />}>
@@ -323,27 +324,27 @@ const ShelfDetailInner: Component<{ shelfId: number }> = (props) => {
                   onClick={() => setShowEdit(true)}
                 >
                   <Pencil class="h-4 w-4" />
-                  Edit
+                  {t("common.edit")}
                 </Button>
                 <Show
                   when={!showDeleteConfirm()}
                   fallback={
                     <div class="flex items-center gap-2">
-                      <span class="text-sm text-slate-400">Are you sure?</span>
+                      <span class="text-sm text-slate-400">{t("common.areYouSure")}</span>
                       <Button
                         variant="danger"
                         size="sm"
                         onClick={handleDelete}
                         loading={deleting()}
                       >
-                        Delete
+                        {t("common.delete")}
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setShowDeleteConfirm(false)}
                       >
-                        Cancel
+                        {t("common.cancel")}
                       </Button>
                     </div>
                   }
@@ -354,7 +355,7 @@ const ShelfDetailInner: Component<{ shelfId: number }> = (props) => {
                     onClick={() => setShowDeleteConfirm(true)}
                   >
                     <Trash2 class="h-4 w-4" />
-                    Delete
+                    {t("common.delete")}
                   </Button>
                 </Show>
               </div>
@@ -385,10 +386,10 @@ const ShelfDetailInner: Component<{ shelfId: number }> = (props) => {
                     <BookMarked class="h-12 w-12 text-slate-600" />
                     <div>
                       <p class="text-lg font-medium text-slate-300">
-                        No books in this shelf yet
+                        {t("shelf.noBooksInShelf")}
                       </p>
                       <p class="mt-1 text-sm text-slate-500">
-                        Add books from their detail page.
+                        {t("shelf.addBooksFromDetail")}
                       </p>
                     </div>
                   </div>
@@ -435,7 +436,7 @@ const ShelfDetail: Component = () => {
       fallback={(err) => (
         <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
           <p class="text-lg font-medium text-red-400">
-            {err.message.includes("404") ? "Shelf not found" : "Failed to load shelf"}
+            {err.message.includes("404") ? t("shelf.shelfNotFound") : t("shelf.failedToLoadShelf")}
           </p>
           <p class="text-sm text-slate-500">{err.message}</p>
         </div>

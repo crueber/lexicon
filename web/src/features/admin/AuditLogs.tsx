@@ -13,6 +13,7 @@ import { ClipboardList, ChevronLeft, ChevronRight } from "lucide-solid";
 import { api } from "../../shared/api/client";
 import Button from "../../shared/ui/Button";
 import Input from "../../shared/ui/Input";
+import { t } from "../../shared/i18n/i18n";
 
 // --- Types ---
 
@@ -39,21 +40,21 @@ interface AuditLogsResponse {
 // --- Action options ---
 
 const actionOptions = [
-  { value: "", label: "All Actions" },
-  { value: "USER_LOGIN", label: "User Login" },
-  { value: "USER_LOGOUT", label: "User Logout" },
-  { value: "USER_CREATED", label: "User Created" },
-  { value: "USER_UPDATED", label: "User Updated" },
-  { value: "USER_DELETED", label: "User Deleted" },
-  { value: "BOOK_DOWNLOADED", label: "Book Downloaded" },
-  { value: "BOOK_METADATA_UPDATED", label: "Metadata Updated" },
-  { value: "BOOK_DELETED", label: "Book Deleted" },
-  { value: "LIBRARY_CREATED", label: "Library Created" },
-  { value: "LIBRARY_UPDATED", label: "Library Updated" },
-  { value: "LIBRARY_DELETED", label: "Library Deleted" },
-  { value: "LIBRARY_SCANNED", label: "Library Scanned" },
-  { value: "SHELF_CREATED", label: "Shelf Created" },
-  { value: "SHELF_DELETED", label: "Shelf Deleted" },
+  { value: "", label: t("admin.allActions") },
+  { value: "USER_LOGIN", label: t("admin.userLogin") },
+  { value: "USER_LOGOUT", label: t("admin.userLogout") },
+  { value: "USER_CREATED", label: t("admin.userCreated") },
+  { value: "USER_UPDATED", label: t("admin.userUpdated") },
+  { value: "USER_DELETED", label: t("admin.userDeleted") },
+  { value: "BOOK_DOWNLOADED", label: t("admin.bookDownloaded") },
+  { value: "BOOK_METADATA_UPDATED", label: t("admin.metadataUpdated") },
+  { value: "BOOK_DELETED", label: t("admin.bookDeleted") },
+  { value: "LIBRARY_CREATED", label: t("admin.libraryCreated") },
+  { value: "LIBRARY_UPDATED", label: t("admin.libraryUpdated") },
+  { value: "LIBRARY_DELETED", label: t("admin.libraryDeleted") },
+  { value: "LIBRARY_SCANNED", label: t("admin.libraryScanned") },
+  { value: "SHELF_CREATED", label: t("admin.shelfCreated") },
+  { value: "SHELF_DELETED", label: t("admin.shelfDeleted") },
 ];
 
 // --- API helper ---
@@ -149,9 +150,9 @@ const AuditLogs: Component = () => {
       {/* Page header */}
       <div class="flex items-center justify-between border-b border-slate-800 px-6 py-5">
         <div>
-          <h1 class="text-xl font-bold text-slate-100">Audit Logs</h1>
+          <h1 class="text-xl font-bold text-slate-100">{t("admin.auditLogs")}</h1>
           <p class="mt-1 text-sm text-slate-400">
-            Track significant actions across the system
+            {t("admin.trackSignificantActions")}
           </p>
         </div>
       </div>
@@ -160,7 +161,7 @@ const AuditLogs: Component = () => {
       <div class="border-b border-slate-800 px-6 py-4">
         <div class="flex flex-wrap items-end gap-3">
           <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-medium text-slate-400">Action</label>
+            <label class="text-xs font-medium text-slate-400">{t("admin.action")}</label>
             <select
               value={filters.action}
               onChange={(e) => setFilters("action", e.currentTarget.value)}
@@ -174,16 +175,16 @@ const AuditLogs: Component = () => {
 
           <div class="w-32">
             <Input
-              label="User ID"
+              label={t("admin.userID")}
               type="number"
               value={filters.userId}
               onInput={(e) => setFilters("userId", e.currentTarget.value)}
-              placeholder="ID"
+              placeholder={t("common.placeholderID")}
             />
           </div>
 
           <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-medium text-slate-400">From</label>
+            <label class="text-xs font-medium text-slate-400">{t("admin.from")}</label>
             <input
               type="date"
               value={filters.from}
@@ -193,7 +194,7 @@ const AuditLogs: Component = () => {
           </div>
 
           <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-medium text-slate-400">To</label>
+            <label class="text-xs font-medium text-slate-400">{t("admin.to")}</label>
             <input
               type="date"
               value={filters.to}
@@ -202,7 +203,7 @@ const AuditLogs: Component = () => {
             />
           </div>
 
-          <Button onClick={applyFilters}>Filter</Button>
+          <Button onClick={applyFilters}>{t("common.filter")}</Button>
         </div>
       </div>
 
@@ -211,19 +212,19 @@ const AuditLogs: Component = () => {
         <ErrorBoundary
           fallback={(err) => (
             <div class="flex flex-col items-center justify-center gap-3 py-20 text-center">
-              <p class="text-lg font-medium text-red-400">Failed to load audit logs</p>
+              <p class="text-lg font-medium text-red-400">{t("admin.failedToLoadAuditLogs")}</p>
               <p class="text-sm text-slate-500">{err.message}</p>
             </div>
           )}
         >
-          <Suspense fallback={<p class="text-slate-400">Loading audit logs...</p>}>
-            <Show when={!data.loading} fallback={<p class="text-slate-400">Loading audit logs...</p>}>
+          <Suspense fallback={<p class="text-slate-400">{t("common.loading")}</p>}>
+            <Show when={!data.loading} fallback={<p class="text-slate-400">{t("common.loading")}</p>}>
               <Show
                 when={(data()?.logs ?? []).length > 0}
                 fallback={
                   <div class="flex flex-col items-center justify-center gap-4 py-20 text-center">
                     <ClipboardList class="h-16 w-16 text-slate-600" />
-                    <p class="text-lg font-medium text-slate-300">No audit logs found</p>
+                    <p class="text-lg font-medium text-slate-300">{t("admin.noAuditLogs")}</p>
                   </div>
                 }
               >
@@ -231,12 +232,12 @@ const AuditLogs: Component = () => {
                   <table class="w-full text-sm">
                     <thead>
                       <tr class="border-b border-slate-700 bg-slate-800/50">
-                        <th class="px-4 py-3 text-left font-medium text-slate-400">Action</th>
-                        <th class="px-4 py-3 text-left font-medium text-slate-400">User</th>
-                        <th class="px-4 py-3 text-left font-medium text-slate-400">Resource</th>
-                        <th class="px-4 py-3 text-left font-medium text-slate-400">Details</th>
-                        <th class="px-4 py-3 text-left font-medium text-slate-400">IP</th>
-                        <th class="px-4 py-3 text-left font-medium text-slate-400">Date</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-400">{t("admin.action")}</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-400">{t("admin.user")}</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-400">{t("admin.resource")}</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-400">{t("admin.details")}</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-400">{t("admin.ip")}</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-400">{t("admin.date")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -283,7 +284,7 @@ const AuditLogs: Component = () => {
                 {/* Pagination */}
                 <div class="mt-4 flex items-center justify-between">
                   <p class="text-sm text-slate-400">
-                    Page {page()} of {totalPages()} ({data()?.total ?? 0} total)
+                    {t("common.page")} {page()} {t("common.of")} {totalPages()} ({data()?.total ?? 0} {t("common.total")})
                   </p>
                   <div class="flex items-center gap-2">
                     <Button
@@ -292,14 +293,14 @@ const AuditLogs: Component = () => {
                       disabled={page() <= 1}
                     >
                       <ChevronLeft class="h-4 w-4" />
-                      Prev
+                      {t("common.prev")}
                     </Button>
                     <Button
                       variant="secondary"
                       onClick={() => goToPage(page() + 1)}
                       disabled={page() >= totalPages()}
                     >
-                      Next
+                      {t("common.next")}
                       <ChevronRight class="h-4 w-4" />
                     </Button>
                   </div>

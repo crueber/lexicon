@@ -11,6 +11,7 @@ import { api } from "../../shared/api/client";
 import { useAuth } from "../auth/AuthProvider";
 import Button from "../../shared/ui/Button";
 import Input from "../../shared/ui/Input";
+import { t } from "../../shared/i18n/i18n";
 
 // ---- Types ----
 
@@ -153,10 +154,10 @@ const ResultCard: Component<{
               <span>{props.result.publishDate}</span>
             </Show>
             <Show when={props.result.pageCount > 0}>
-              <span>{props.result.pageCount} pages</span>
+              <span>{props.result.pageCount} {t("metadata.pages")}</span>
             </Show>
             <Show when={props.result.isbn13}>
-              <span>ISBN: {props.result.isbn13}</span>
+              <span>{t("metadata.isbn")}: {props.result.isbn13}</span>
             </Show>
           </div>
 
@@ -178,12 +179,12 @@ const ResultCard: Component<{
                   when={expanded()}
                   fallback={
                     <>
-                      More <ChevronDown class="h-3 w-3" />
+                      {t("common.more")} <ChevronDown class="h-3 w-3" />
                     </>
                   }
                 >
                   <>
-                    Less <ChevronUp class="h-3 w-3" />
+                    {t("common.less")} <ChevronUp class="h-3 w-3" />
                   </>
                 </Show>
               </button>
@@ -200,9 +201,9 @@ const ResultCard: Component<{
             loading={creating()}
             disabled={created()}
           >
-            <Show when={created()} fallback={<>Use this</>}>
+            <Show when={created()} fallback={<>{t("metadata.useThis")}</>}>
               <Check class="h-4 w-4" />
-              Added
+              {t("metadata.added")}
             </Show>
           </Button>
         </div>
@@ -279,7 +280,7 @@ const ProposalCard: Component<{
               loading={accepting()}
             >
               <Check class="h-4 w-4" />
-              Accept
+              {t("metadata.accept")}
             </Button>
             <Button
               variant="danger"
@@ -288,7 +289,7 @@ const ProposalCard: Component<{
               loading={rejecting()}
             >
               <X class="h-4 w-4" />
-              Reject
+              {t("metadata.reject")}
             </Button>
           </div>
         </Show>
@@ -300,16 +301,16 @@ const ProposalCard: Component<{
 // ---- Lock toggles ----
 
 const lockFields = [
-  { key: "title", label: "Title" },
-  { key: "subtitle", label: "Subtitle" },
-  { key: "description", label: "Description" },
-  { key: "publisher", label: "Publisher" },
-  { key: "publishDate", label: "Publish Date" },
-  { key: "pageCount", label: "Page Count" },
-  { key: "language", label: "Language" },
-  { key: "isbn10", label: "ISBN-10" },
-  { key: "isbn13", label: "ISBN-13" },
-  { key: "cover", label: "Cover" },
+  { key: "title", label: t("common.title") },
+  { key: "subtitle", label: t("common.subtitle") },
+  { key: "description", label: t("common.description") },
+  { key: "publisher", label: t("common.publisher") },
+  { key: "publishDate", label: t("common.published") },
+  { key: "pageCount", label: t("common.pageCount") },
+  { key: "language", label: t("common.language") },
+  { key: "isbn10", label: t("common.isbn10") },
+  { key: "isbn13", label: t("common.isbn13") },
+  { key: "cover", label: t("common.cover") },
 ] as const;
 
 const FieldLocks: Component<{ bookId: number }> = (props) => {
@@ -330,7 +331,7 @@ const FieldLocks: Component<{ bookId: number }> = (props) => {
   return (
     <div class="flex flex-col gap-2">
       <p class="text-xs font-medium uppercase tracking-wide text-slate-500">
-        Field Locks
+        {t("metadata.fieldLocks")}
       </p>
       <div class="flex flex-wrap gap-2">
         <For each={lockFields}>
@@ -397,7 +398,7 @@ const MetadataSearch: Component<MetadataSearchProps> = (props) => {
 
   async function handleSearch() {
     if (!title() && !author() && !isbn()) {
-      setSearchError("Enter at least one search term");
+      setSearchError(t("metadata.enterSearchTerm"));
       return;
     }
     setSearchError(null);
@@ -406,7 +407,7 @@ const MetadataSearch: Component<MetadataSearchProps> = (props) => {
       const results = await searchMetadata(title(), author(), isbn(), props.bookType);
       setSearchResults(results);
     } catch {
-      setSearchError("Search failed. Please try again.");
+      setSearchError(t("metadata.searchFailed"));
     } finally {
       setSearching(false);
     }
@@ -421,7 +422,7 @@ const MetadataSearch: Component<MetadataSearchProps> = (props) => {
       <div class="w-full max-w-2xl rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
         {/* Header */}
         <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
-          <h2 class="text-lg font-semibold text-slate-100">Find Metadata</h2>
+          <h2 class="text-lg font-semibold text-slate-100">{t("metadata.findMetadata")}</h2>
           <button
             onClick={props.onClose}
             class="text-slate-400 hover:text-slate-200 transition-colors"
@@ -435,21 +436,21 @@ const MetadataSearch: Component<MetadataSearchProps> = (props) => {
           <div class="flex flex-col gap-4">
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Input
-                label="Title"
-                placeholder="e.g. The Way of Kings"
+                label={t("metadata.title")}
+                placeholder={t("common.placeholderBookTitle")}
                 value={title()}
                 onInput={(e) => setTitle(e.currentTarget.value)}
               />
               <Input
-                label="Author"
-                placeholder="e.g. Brandon Sanderson"
+                label={t("metadata.author")}
+                placeholder={t("common.placeholderAuthor")}
                 value={author()}
                 onInput={(e) => setAuthor(e.currentTarget.value)}
               />
             </div>
             <Input
-              label="ISBN"
-              placeholder="e.g. 9780765326355"
+              label={t("metadata.isbn")}
+              placeholder={t("common.placeholderISBN")}
               value={isbn()}
               onInput={(e) => setIsbn(e.currentTarget.value)}
             />
@@ -462,14 +463,14 @@ const MetadataSearch: Component<MetadataSearchProps> = (props) => {
               loading={searching()}
             >
               <Search class="h-4 w-4" />
-              Search
+              {t("common.search")}
             </Button>
           </div>
 
           {/* Search results */}
           <Show when={hasResults()}>
             <div class="flex flex-col gap-3">
-              <p class="text-sm font-medium text-slate-400">Search Results</p>
+              <p class="text-sm font-medium text-slate-400">{t("metadata.searchResults")}</p>
               <For each={Object.entries(searchResults())}>
                 {([provider, results]) => (
                   <Show when={results.length > 0}>
@@ -497,7 +498,7 @@ const MetadataSearch: Component<MetadataSearchProps> = (props) => {
           <Suspense>
             <Show when={(proposals() ?? []).length > 0}>
               <div class="flex flex-col gap-3">
-                <p class="text-sm font-medium text-slate-400">Proposals</p>
+                <p class="text-sm font-medium text-slate-400">{t("metadata.proposals")}</p>
                 <For each={proposals() ?? []}>
                   {(proposal) => (
                     <ProposalCard

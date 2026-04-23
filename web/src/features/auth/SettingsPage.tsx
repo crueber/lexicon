@@ -13,6 +13,7 @@ import { useAuth } from "./AuthProvider";
 import Button from "../../shared/ui/Button";
 import Input from "../../shared/ui/Input";
 import { showToast } from "../../shared/ui/Toast";
+import { t } from "../../shared/i18n/i18n";
 
 // --- Types ---
 
@@ -100,9 +101,9 @@ const ProfileSection: Component = () => {
           email: form.email || null,
         }),
       });
-      showToast("Profile updated", "success");
+      showToast(t("common.profileUpdated"), "success");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to update profile");
+      setError(err instanceof Error ? err.message : t("common.failedToUpdateProfile"));
     } finally {
       setLoading(false);
     }
@@ -112,28 +113,28 @@ const ProfileSection: Component = () => {
     <section class="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
       <h2 class="mb-4 flex items-center gap-2 text-base font-semibold text-slate-100">
         <User class="h-5 w-5 text-indigo-400" />
-        Profile
+        {t("common.profile")}
       </h2>
-      <Show when={!profile.loading} fallback={<p class="text-sm text-slate-400">Loading...</p>}>
+      <Show when={!profile.loading} fallback={<p class="text-sm text-slate-400">{t("common.loading")}</p>}>
         <form onSubmit={handleSave} class="flex flex-col gap-4">
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-slate-300">Username</label>
+            <label class="text-sm font-medium text-slate-300">{t("common.username")}</label>
             <p class="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-400">
               @{profile()?.username}
             </p>
           </div>
           <Input
-            label="Display Name"
+            label={t("common.displayName")}
             value={form.name}
             onInput={(e) => setForm("name", e.currentTarget.value)}
-            placeholder="Your name"
+            placeholder={t("common.yourName")}
           />
           <Input
-            label="Email"
+            label={t("common.email")}
             type="email"
             value={form.email}
             onInput={(e) => setForm("email", e.currentTarget.value)}
-            placeholder="you@example.com"
+            placeholder={t("common.youAtExample")}
           />
           <Show when={error()}>
             <p class="text-sm text-red-400">{error()}</p>
@@ -141,7 +142,7 @@ const ProfileSection: Component = () => {
           <div class="flex justify-end">
             <Button type="submit" loading={loading()}>
               <Save class="h-4 w-4" />
-              Save Profile
+              {t("common.saveProfile")}
             </Button>
           </div>
         </form>
@@ -164,11 +165,11 @@ const PasswordSection: Component = () => {
   async function handleSave(e: Event) {
     e.preventDefault();
     if (form.newPassword !== form.confirmPassword) {
-      setError("New passwords do not match");
+      setError(t("common.newPasswordsDoNotMatch"));
       return;
     }
     if (form.newPassword.length < 6) {
-      setError("New password must be at least 6 characters");
+      setError(t("common.passwordMinLength"));
       return;
     }
     setLoading(true);
@@ -186,9 +187,9 @@ const PasswordSection: Component = () => {
         s.newPassword = "";
         s.confirmPassword = "";
       }));
-      showToast("Password changed successfully", "success");
+      showToast(t("common.passwordChanged"), "success");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to change password");
+      setError(err instanceof Error ? err.message : t("common.failedToChangePassword"));
     } finally {
       setLoading(false);
     }
@@ -198,11 +199,11 @@ const PasswordSection: Component = () => {
     <section class="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
       <h2 class="mb-4 flex items-center gap-2 text-base font-semibold text-slate-100">
         <Lock class="h-5 w-5 text-indigo-400" />
-        Password
+        {t("common.password")}
       </h2>
       <form onSubmit={handleSave} class="flex flex-col gap-4">
         <Input
-          label="Current Password"
+          label={t("common.currentPassword")}
           type="password"
           value={form.currentPassword}
           onInput={(e) => setForm("currentPassword", e.currentTarget.value)}
@@ -210,7 +211,7 @@ const PasswordSection: Component = () => {
           required
         />
         <Input
-          label="New Password"
+          label={t("common.newPassword")}
           type="password"
           value={form.newPassword}
           onInput={(e) => setForm("newPassword", e.currentTarget.value)}
@@ -218,7 +219,7 @@ const PasswordSection: Component = () => {
           required
         />
         <Input
-          label="Confirm New Password"
+          label={t("common.confirmNewPassword")}
           type="password"
           value={form.confirmPassword}
           onInput={(e) => setForm("confirmPassword", e.currentTarget.value)}
@@ -231,7 +232,7 @@ const PasswordSection: Component = () => {
         <div class="flex justify-end">
           <Button type="submit" loading={loading()}>
             <Save class="h-4 w-4" />
-            Change Password
+            {t("common.changePassword")}
           </Button>
         </div>
       </form>
@@ -273,9 +274,9 @@ const AppearanceSection: Component = () => {
           bookCardsPerRow: form.bookCardsPerRow,
         }),
       });
-      showToast("Appearance settings saved", "success");
+      showToast(t("common.appearanceSaved"), "success");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to save settings");
+      setError(err instanceof Error ? err.message : t("common.failedToSaveSettings"));
     } finally {
       setLoading(false);
     }
@@ -285,28 +286,28 @@ const AppearanceSection: Component = () => {
     <section class="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
       <h2 class="mb-4 flex items-center gap-2 text-base font-semibold text-slate-100">
         <Palette class="h-5 w-5 text-indigo-400" />
-        Appearance
+        {t("common.appearance")}
       </h2>
-      <Show when={!settings.loading} fallback={<p class="text-sm text-slate-400">Loading...</p>}>
+      <Show when={!settings.loading} fallback={<p class="text-sm text-slate-400">{t("common.loading")}</p>}>
         <form onSubmit={handleSave} class="flex flex-col gap-4">
               <div class="flex flex-col gap-1.5">
-                <label class="text-sm font-medium text-slate-300">Theme</label>
+                <label class="text-sm font-medium text-slate-300">{t("common.theme")}</label>
                 <div class="flex gap-3">
                   <ThemeOption
                     value="dark"
-                    label="Dark"
+                    label={t("common.dark")}
                     selected={form.theme === "dark"}
                     onSelect={() => setForm("theme", "dark")}
                   />
                   <ThemeOption
                     value="light"
-                    label="Light"
+                    label={t("common.light")}
                     selected={form.theme === "light"}
                     onSelect={() => setForm("theme", "light")}
                   />
                   <ThemeOption
                     value="system"
-                    label="System"
+                    label={t("common.system")}
                     selected={form.theme === "system"}
                     onSelect={() => setForm("theme", "system")}
                   />
@@ -316,7 +317,7 @@ const AppearanceSection: Component = () => {
               <div class="flex flex-col gap-2">
                 <div class="flex items-center justify-between">
                   <label class="text-sm font-medium text-slate-300">
-                    Books per row
+                    {t("common.booksPerRow")}
                   </label>
                   <span class="text-sm font-medium text-indigo-400">
                     {form.bookCardsPerRow}
@@ -345,7 +346,7 @@ const AppearanceSection: Component = () => {
               <div class="flex justify-end">
                 <Button type="submit" loading={loading()}>
                   <Save class="h-4 w-4" />
-                  Save Appearance
+                  {t("common.saveAppearance")}
                 </Button>
               </div>
             </form>
@@ -390,7 +391,7 @@ const ContentRestrictionsSection: Component = () => {
   async function handleAdd(e: Event) {
     e.preventDefault();
     if (!form.value.trim()) {
-      setError("Value is required");
+      setError(t("common.valueRequired"));
       return;
     }
     setLoading(true);
@@ -404,10 +405,10 @@ const ContentRestrictionsSection: Component = () => {
       setForm(produce((s) => {
         s.value = "";
       }));
-      showToast("Restriction added", "success");
+      showToast(t("common.restrictionAdded"), "success");
       refetch();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to add restriction");
+      setError(err instanceof Error ? err.message : t("common.failedToAddRestriction"));
     } finally {
       setLoading(false);
     }
@@ -416,10 +417,10 @@ const ContentRestrictionsSection: Component = () => {
   async function handleDelete(id: number) {
     try {
       await deleteContentRestriction(id);
-      showToast("Restriction removed", "success");
+      showToast(t("common.restrictionRemoved"), "success");
       refetch();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to remove restriction");
+      setError(err instanceof Error ? err.message : t("common.failedToRemoveRestriction"));
     }
   }
 
@@ -427,9 +428,9 @@ const ContentRestrictionsSection: Component = () => {
     <section class="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
       <h2 class="mb-4 flex items-center gap-2 text-base font-semibold text-slate-100">
         <Shield class="h-5 w-5 text-indigo-400" />
-        Content Restrictions
+        {t("common.contentRestrictions")}
       </h2>
-      <Show when={!restrictions.loading} fallback={<p class="text-sm text-slate-400">Loading...</p>}>
+      <Show when={!restrictions.loading} fallback={<p class="text-sm text-slate-400">{t("common.loading")}</p>}>
         <div class="flex flex-col gap-4">
           <Show when={(restrictions() ?? []).length > 0}>
             <div class="flex flex-col gap-2">
@@ -446,7 +447,7 @@ const ContentRestrictionsSection: Component = () => {
                       type="button"
                       onClick={() => handleDelete(r.id)}
                       class="rounded p-1 text-slate-400 hover:bg-red-600/20 hover:text-red-400"
-                      title="Remove restriction"
+                      title={t("common.removeRestriction")}
                     >
                       <Trash2 class="h-4 w-4" />
                     </button>
@@ -459,36 +460,36 @@ const ContentRestrictionsSection: Component = () => {
           <form onSubmit={handleAdd} class="flex flex-col gap-3">
             <div class="grid grid-cols-2 gap-3">
               <div class="flex flex-col gap-1.5">
-                <label class="text-sm font-medium text-slate-300">Type</label>
+                <label class="text-sm font-medium text-slate-300">{t("common.type")}</label>
                 <select
                   value={form.restrictionType}
                   onChange={(e) => setForm("restrictionType", e.currentTarget.value)}
                   class="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200"
                 >
-                  <option value="CATEGORY">Category</option>
-                  <option value="TAG">Tag</option>
-                  <option value="MOOD">Mood</option>
-                  <option value="AGE_RATING">Age Rating</option>
-                  <option value="CONTENT_RATING">Content Rating</option>
+                  <option value="CATEGORY">{t("common.category")}</option>
+                  <option value="TAG">{t("common.tag")}</option>
+                  <option value="MOOD">{t("common.mood")}</option>
+                  <option value="AGE_RATING">{t("common.ageRating")}</option>
+                  <option value="CONTENT_RATING">{t("common.contentRating")}</option>
                 </select>
               </div>
               <div class="flex flex-col gap-1.5">
-                <label class="text-sm font-medium text-slate-300">Mode</label>
+                <label class="text-sm font-medium text-slate-300">{t("common.mode")}</label>
                 <select
                   value={form.mode}
                   onChange={(e) => setForm("mode", e.currentTarget.value)}
                   class="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200"
                 >
-                  <option value="EXCLUDE">Exclude</option>
-                  <option value="ALLOW_ONLY">Allow Only</option>
+                  <option value="EXCLUDE">{t("common.exclude")}</option>
+                  <option value="ALLOW_ONLY">{t("common.allowOnly")}</option>
                 </select>
               </div>
             </div>
             <Input
-              label="Value"
+              label={t("common.value")}
               value={form.value}
               onInput={(e) => setForm("value", e.currentTarget.value)}
-              placeholder="e.g. Horror"
+              placeholder={t("common.placeholderGenre")}
             />
             <Show when={error()}>
               <p class="text-sm text-red-400">{error()}</p>
@@ -496,7 +497,7 @@ const ContentRestrictionsSection: Component = () => {
             <div class="flex justify-end">
               <Button type="submit" loading={loading()}>
                 <Save class="h-4 w-4" />
-                Add Restriction
+                {t("common.addRestriction")}
               </Button>
             </div>
           </form>
@@ -513,9 +514,9 @@ const SettingsPage: Component = () => {
     <div class="flex flex-1 flex-col">
       {/* Page header */}
       <div class="border-b border-slate-800 px-6 py-5">
-        <h1 class="text-xl font-bold text-slate-100">Settings</h1>
+        <h1 class="text-xl font-bold text-slate-100">{t("auth.settingsTitle")}</h1>
         <p class="mt-1 text-sm text-slate-400">
-          Manage your profile, password, and preferences
+          {t("auth.settingsSubtitle")}
         </p>
       </div>
 

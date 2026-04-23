@@ -17,6 +17,7 @@ import { useWS } from "../../shared/ws/WSProvider";
 import Button from "../../shared/ui/Button";
 import Skeleton from "../../shared/ui/Skeleton";
 import BookCard from "../book/BookCard";
+import { t } from "../../shared/i18n/i18n";
 import type { Library, BooksResponse } from "./types";
 
 const PAGE_SIZE = 24;
@@ -73,10 +74,10 @@ const BookTypeFilterBar: Component<{
   onChange: (v: BookTypeFilter) => void;
 }> = (props) => {
   const options: { label: string; value: BookTypeFilter }[] = [
-    { label: "All", value: "ALL" },
-    { label: "Ebooks", value: "EBOOK" },
-    { label: "Audiobooks", value: "AUDIOBOOK" },
-    { label: "Comics", value: "COMIC" },
+    { label: t("common.all"), value: "ALL" },
+    { label: t("common.ebooks"), value: "EBOOK" },
+    { label: t("common.audiobooks"), value: "AUDIOBOOK" },
+    { label: t("common.comics"), value: "COMIC" },
   ];
 
   return (
@@ -105,10 +106,10 @@ const SortSelect: Component<{
   onChange: (v: SortOption) => void;
 }> = (props) => {
   const options: { label: string; value: SortOption }[] = [
-    { label: "Recently Added", value: "addedDate_DESC" },
-    { label: "Oldest First", value: "addedDate_ASC" },
-    { label: "Title A–Z", value: "title_ASC" },
-    { label: "Title Z–A", value: "title_DESC" },
+    { label: t("common.recentlyAdded"), value: "addedDate_DESC" },
+    { label: t("common.oldestFirst"), value: "addedDate_ASC" },
+    { label: t("common.titleAZ"), value: "title_ASC" },
+    { label: t("common.titleZA"), value: "title_DESC" },
   ];
 
   return (
@@ -140,10 +141,10 @@ const Pagination: Component<{
         disabled={props.page <= 1}
       >
         <ChevronLeft class="h-4 w-4" />
-        Prev
+        {t("common.prev")}
       </Button>
       <span class="text-sm text-slate-400">
-        Page {props.page} of {props.totalPages}
+        {t("common.page")} {props.page} {t("common.of")} {props.totalPages}
       </span>
       <Button
         variant="secondary"
@@ -151,7 +152,7 @@ const Pagination: Component<{
         onClick={props.onNext}
         disabled={props.page >= props.totalPages}
       >
-        Next
+        {t("common.next")}
         <ChevronRight class="h-4 w-4" />
       </Button>
     </div>
@@ -246,7 +247,7 @@ const LibraryBrowserInner: Component<{ libraryId: number }> = (props) => {
                     {(data) => (
                       <p class="mt-1 text-sm text-slate-400">
                         {data().total.toLocaleString()}{" "}
-                        {data().total === 1 ? "book" : "books"}
+                        {data().total === 1 ? t("common.book") : t("common.books")}
                       </p>
                     )}
                   </Show>
@@ -264,7 +265,7 @@ const LibraryBrowserInner: Component<{ libraryId: number }> = (props) => {
               loading={scanning()}
             >
               <ScanLine class="h-4 w-4" />
-              Scan
+              {t("common.scan")}
             </Button>
           </Show>
         </div>
@@ -289,9 +290,9 @@ const LibraryBrowserInner: Component<{ libraryId: number }> = (props) => {
             when={(booksData()?.books ?? []).length > 0}
             fallback={
               <div class="flex flex-col items-center justify-center gap-4 py-20 text-center">
-                <p class="text-lg font-medium text-slate-300">No books found</p>
+                <p class="text-lg font-medium text-slate-300">{t("common.noBooksFound")}</p>
                 <p class="text-sm text-slate-500">
-                  Try changing the filters or scan the library.
+                  {t("common.tryChangingFilters")}
                 </p>
               </div>
             }
@@ -330,7 +331,7 @@ const LibraryBrowser: Component = () => {
       fallback={(err) => (
         <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
           <p class="text-lg font-medium text-red-400">
-            Failed to load library
+            {t("errors.failedToLoadBook")}
           </p>
           <p class="text-sm text-slate-500">{err.message}</p>
         </div>

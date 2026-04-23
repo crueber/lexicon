@@ -26,6 +26,7 @@ import { useAuth } from "../auth/AuthProvider";
 import Button from "../../shared/ui/Button";
 import Input from "../../shared/ui/Input";
 import { showToast } from "../../shared/ui/Toast";
+import { t } from "../../shared/i18n/i18n";
 
 // --- Types ---
 
@@ -89,7 +90,7 @@ const CreateUserDialog: Component<CreateUserDialogProps> = (props) => {
   async function handleSubmit(e: Event) {
     e.preventDefault();
     if (!form.username || !form.password) {
-      setError("Username and password are required");
+      setError(t("admin.usernameAndPasswordRequired"));
       return;
     }
     setLoading(true);
@@ -108,7 +109,7 @@ const CreateUserDialog: Component<CreateUserDialogProps> = (props) => {
       showToast(`User "${form.username}" created`, "success");
       props.onCreated();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to create user");
+      setError(err instanceof Error ? err.message : t("admin.failedToCreateUser"));
     } finally {
       setLoading(false);
     }
@@ -118,7 +119,7 @@ const CreateUserDialog: Component<CreateUserDialogProps> = (props) => {
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div class="w-full max-w-md rounded-xl bg-slate-900 border border-slate-700 shadow-2xl">
         <div class="flex items-center justify-between border-b border-slate-700 px-6 py-4">
-          <h2 class="text-lg font-semibold text-slate-100">Create User</h2>
+          <h2 class="text-lg font-semibold text-slate-100">{t("admin.createUser")}</h2>
           <button
             onClick={props.onClose}
             class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
@@ -128,14 +129,14 @@ const CreateUserDialog: Component<CreateUserDialogProps> = (props) => {
         </div>
         <form onSubmit={handleSubmit} class="flex flex-col gap-4 p-6">
           <Input
-            label="Username"
+            label={t("admin.username")}
             value={form.username}
             onInput={(e) => setForm("username", e.currentTarget.value)}
-            placeholder="johndoe"
+            placeholder={t("common.placeholderUsername")}
             required
           />
           <Input
-            label="Password"
+            label={t("admin.password")}
             type="password"
             value={form.password}
             onInput={(e) => setForm("password", e.currentTarget.value)}
@@ -143,27 +144,27 @@ const CreateUserDialog: Component<CreateUserDialogProps> = (props) => {
             required
           />
           <Input
-            label="Name (optional)"
+            label={t("admin.name")}
             value={form.name}
             onInput={(e) => setForm("name", e.currentTarget.value)}
-            placeholder="John Doe"
+            placeholder={t("common.placeholderName")}
           />
           <Input
-            label="Email (optional)"
+            label={t("admin.email")}
             type="email"
             value={form.email}
             onInput={(e) => setForm("email", e.currentTarget.value)}
-            placeholder="john@example.com"
+            placeholder={t("common.placeholderEmail")}
           />
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-slate-300">Role</label>
+            <label class="text-sm font-medium text-slate-300">{t("admin.role")}</label>
             <select
               value={form.role}
               onChange={(e) => setForm("role", e.currentTarget.value)}
               class="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900"
             >
-              <option value="USER">User</option>
-              <option value="ADMIN">Admin</option>
+              <option value="USER">{t("admin.userRole")}</option>
+              <option value="ADMIN">{t("admin.adminRole")}</option>
             </select>
           </div>
           <Show when={error()}>
@@ -171,10 +172,10 @@ const CreateUserDialog: Component<CreateUserDialogProps> = (props) => {
           </Show>
           <div class="flex justify-end gap-3 pt-2">
             <Button variant="secondary" type="button" onClick={props.onClose}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" loading={loading()}>
-              Create User
+              {t("admin.createUser")}
             </Button>
           </div>
         </form>
@@ -271,10 +272,10 @@ const EditUserDialog: Component<EditUserDialogProps> = (props) => {
         method: "PUT",
         body: JSON.stringify({ libraryIds: form.libraryIds }),
       });
-      showToast("User updated", "success");
+      showToast(t("common.save"), "success");
       props.onSaved();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to save changes");
+      setError(err instanceof Error ? err.message : t("admin.failedToSaveChanges"));
     } finally {
       setLoading(false);
     }
@@ -285,7 +286,7 @@ const EditUserDialog: Component<EditUserDialogProps> = (props) => {
       <div class="w-full max-w-lg rounded-xl bg-slate-900 border border-slate-700 shadow-2xl max-h-[90vh] flex flex-col">
         <div class="flex items-center justify-between border-b border-slate-700 px-6 py-4 shrink-0">
           <h2 class="text-lg font-semibold text-slate-100">
-            Edit User
+            {t("admin.editUser")}
             <Show when={user()}>
               <span class="ml-2 text-sm font-normal text-slate-400">
                 @{user()!.username}
@@ -301,27 +302,27 @@ const EditUserDialog: Component<EditUserDialogProps> = (props) => {
         </div>
 
         <div class="flex-1 overflow-y-auto p-6">
-          <Show when={!user.loading} fallback={<p class="text-slate-400">Loading...</p>}>
+          <Show when={!user.loading} fallback={<p class="text-slate-400">{t("common.loading")}</p>}>
             <div class="flex flex-col gap-6">
               {/* Profile */}
               <section>
                 <h3 class="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-500">
                   <Users class="h-4 w-4" />
-                  Profile
+                  {t("admin.profile")}
                 </h3>
                 <div class="flex flex-col gap-3">
                   <Input
-                    label="Name"
+                    label={t("admin.name")}
                     value={form.name}
                     onInput={(e) => setForm("name", e.currentTarget.value)}
-                    placeholder="Full name"
+                    placeholder={t("common.placeholderFullName")}
                   />
                   <Input
-                    label="Email"
+                    label={t("admin.email")}
                     type="email"
                     value={form.email}
                     onInput={(e) => setForm("email", e.currentTarget.value)}
-                    placeholder="user@example.com"
+                    placeholder={t("common.placeholderEmail")}
                   />
                   <div class="flex items-center gap-3">
                     <input
@@ -332,7 +333,7 @@ const EditUserDialog: Component<EditUserDialogProps> = (props) => {
                       class="h-4 w-4 rounded border-slate-600 bg-slate-800 text-indigo-600 focus:ring-indigo-500"
                     />
                     <label for="enabled" class="text-sm text-slate-300">
-                      Account enabled
+                      {t("admin.accountEnabled")}
                     </label>
                   </div>
                 </div>
@@ -342,48 +343,48 @@ const EditUserDialog: Component<EditUserDialogProps> = (props) => {
               <section>
                 <h3 class="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-500">
                   <Shield class="h-4 w-4" />
-                  Permissions
+                  {t("admin.permissions")}
                 </h3>
                 <div class="flex flex-col gap-3">
                   <div class="flex flex-col gap-1.5">
-                    <label class="text-sm font-medium text-slate-300">Role</label>
+                    <label class="text-sm font-medium text-slate-300">{t("admin.role")}</label>
                     <select
                       value={form.role}
                       onChange={(e) => setForm("role", e.currentTarget.value)}
                       class="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900"
                     >
-                      <option value="USER">User</option>
-                      <option value="ADMIN">Admin</option>
+                      <option value="USER">{t("admin.userRole")}</option>
+                      <option value="ADMIN">{t("admin.adminRole")}</option>
                     </select>
                   </div>
                   <div class="grid grid-cols-2 gap-2">
                     <PermCheckbox
                       id="canDownload"
-                      label="Can Download"
+                      label={t("admin.canDownload")}
                       checked={form.canDownload}
                       onChange={(v) => setForm("canDownload", v)}
                     />
                     <PermCheckbox
                       id="canUpload"
-                      label="Can Upload"
+                      label={t("admin.canUpload")}
                       checked={form.canUpload}
                       onChange={(v) => setForm("canUpload", v)}
                     />
                     <PermCheckbox
                       id="canEmailSend"
-                      label="Can Email"
+                      label={t("admin.canEmail")}
                       checked={form.canEmailSend}
                       onChange={(v) => setForm("canEmailSend", v)}
                     />
                     <PermCheckbox
                       id="canEditMetadata"
-                      label="Edit Metadata"
+                      label={t("admin.editMetadata")}
                       checked={form.canEditMetadata}
                       onChange={(v) => setForm("canEditMetadata", v)}
                     />
                     <PermCheckbox
                       id="opdsAccess"
-                      label="OPDS Access"
+                      label={t("admin.opdsAccess")}
                       checked={form.opdsAccess}
                       onChange={(v) => setForm("opdsAccess", v)}
                     />
@@ -395,15 +396,15 @@ const EditUserDialog: Component<EditUserDialogProps> = (props) => {
               <section>
                 <h3 class="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-500">
                   <Library class="h-4 w-4" />
-                  Library Access
+                  {t("admin.libraryAccess")}
                 </h3>
                 <Show
                   when={!libraries.loading}
-                  fallback={<p class="text-sm text-slate-400">Loading libraries...</p>}
+                  fallback={<p class="text-sm text-slate-400">{t("admin.loadingLibraries")}</p>}
                 >
                   <Show
                     when={(libraries() ?? []).length > 0}
-                    fallback={<p class="text-sm text-slate-400">No libraries available</p>}
+                    fallback={<p class="text-sm text-slate-400">{t("admin.noLibrariesAvailable")}</p>}
                   >
                     <div class="flex flex-col gap-2">
                       <For each={libraries()}>
@@ -448,10 +449,10 @@ const EditUserDialog: Component<EditUserDialogProps> = (props) => {
           </Show>
           <div class="flex justify-end gap-3">
             <Button variant="secondary" onClick={props.onClose}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={handleSave} loading={loading()}>
-              Save Changes
+              {t("common.save")}
             </Button>
           </div>
         </div>
@@ -476,7 +477,7 @@ const ResetPasswordDialog: Component<ResetPasswordDialogProps> = (props) => {
   async function handleSubmit(e: Event) {
     e.preventDefault();
     if (password().length < 6) {
-      setError("Password must be at least 6 characters");
+      setError(t("admin.passwordMinLength"));
       return;
     }
     setLoading(true);
@@ -489,7 +490,7 @@ const ResetPasswordDialog: Component<ResetPasswordDialogProps> = (props) => {
       showToast(`Password reset for @${props.username}`, "success");
       props.onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to reset password");
+      setError(err instanceof Error ? err.message : t("admin.failedToResetPassword"));
     } finally {
       setLoading(false);
     }
@@ -499,7 +500,7 @@ const ResetPasswordDialog: Component<ResetPasswordDialogProps> = (props) => {
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div class="w-full max-w-sm rounded-xl bg-slate-900 border border-slate-700 shadow-2xl">
         <div class="flex items-center justify-between border-b border-slate-700 px-6 py-4">
-          <h2 class="text-lg font-semibold text-slate-100">Reset Password</h2>
+          <h2 class="text-lg font-semibold text-slate-100">{t("admin.resetPassword")}</h2>
           <button
             onClick={props.onClose}
             class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
@@ -509,10 +510,10 @@ const ResetPasswordDialog: Component<ResetPasswordDialogProps> = (props) => {
         </div>
         <form onSubmit={handleSubmit} class="flex flex-col gap-4 p-6">
           <p class="text-sm text-slate-400">
-            Set a new password for <span class="font-medium text-slate-200">@{props.username}</span>.
+            {t("admin.setNewPasswordFor")} <span class="font-medium text-slate-200">@{props.username}</span>.
           </p>
           <Input
-            label="New Password"
+            label={t("admin.newPassword")}
             type="password"
             value={password()}
             onInput={(e) => setPassword(e.currentTarget.value)}
@@ -524,10 +525,10 @@ const ResetPasswordDialog: Component<ResetPasswordDialogProps> = (props) => {
           </Show>
           <div class="flex justify-end gap-3 pt-2">
             <Button variant="secondary" type="button" onClick={props.onClose}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" loading={loading()}>
-              Reset Password
+              {t("admin.resetPassword")}
             </Button>
           </div>
         </form>
@@ -556,7 +557,7 @@ const DeleteConfirmDialog: Component<DeleteConfirmDialogProps> = (props) => {
       props.onDeleted();
     } catch (err: unknown) {
       showToast(
-        err instanceof Error ? err.message : "Failed to delete user",
+        err instanceof Error ? err.message : t("admin.failedToDeleteUser"),
         "error"
       );
     } finally {
@@ -568,7 +569,7 @@ const DeleteConfirmDialog: Component<DeleteConfirmDialogProps> = (props) => {
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div class="w-full max-w-sm rounded-xl bg-slate-900 border border-slate-700 shadow-2xl">
         <div class="flex items-center justify-between border-b border-slate-700 px-6 py-4">
-          <h2 class="text-lg font-semibold text-slate-100">Delete User</h2>
+          <h2 class="text-lg font-semibold text-slate-100">{t("admin.deleteUser")}</h2>
           <button
             onClick={props.onClose}
             class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
@@ -578,16 +579,16 @@ const DeleteConfirmDialog: Component<DeleteConfirmDialogProps> = (props) => {
         </div>
         <div class="flex flex-col gap-4 p-6">
           <p class="text-sm text-slate-300">
-            Are you sure you want to delete{" "}
-            <span class="font-medium text-slate-100">@{props.username}</span>?
-            This action cannot be undone.
+            {t("admin.deleteUserConfirm")}{" "}
+            <span class="font-medium text-slate-100">@{props.username}</span>?{" "}
+            {t("admin.actionCannotBeUndone")}
           </p>
           <div class="flex justify-end gap-3">
             <Button variant="secondary" onClick={props.onClose}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button variant="danger" onClick={handleDelete} loading={loading()}>
-              Delete User
+              {t("admin.deleteUser")}
             </Button>
           </div>
         </div>
@@ -664,14 +665,14 @@ const UserManagement: Component = () => {
       {/* Page header */}
       <div class="flex items-center justify-between border-b border-slate-800 px-6 py-5">
         <div>
-          <h1 class="text-xl font-bold text-slate-100">User Management</h1>
+          <h1 class="text-xl font-bold text-slate-100">{t("admin.userManagement")}</h1>
           <p class="mt-1 text-sm text-slate-400">
-            Manage users, roles, and permissions
+            {t("admin.manageUsersRoles")}
           </p>
         </div>
         <Button onClick={() => setDialog({ type: "create" })}>
           <Plus class="h-4 w-4" />
-          Create User
+          {t("admin.createUser")}
         </Button>
       </div>
 
@@ -680,19 +681,19 @@ const UserManagement: Component = () => {
         <ErrorBoundary
           fallback={(err) => (
             <div class="flex flex-col items-center justify-center gap-3 py-20 text-center">
-              <p class="text-lg font-medium text-red-400">Failed to load users</p>
+              <p class="text-lg font-medium text-red-400">{t("admin.failedToLoadUsers")}</p>
               <p class="text-sm text-slate-500">{err.message}</p>
             </div>
           )}
         >
-          <Suspense fallback={<p class="text-slate-400">Loading users...</p>}>
-            <Show when={!users.loading} fallback={<p class="text-slate-400">Loading users...</p>}>
+          <Suspense fallback={<p class="text-slate-400">{t("admin.loadingUsers")}</p>}>
+            <Show when={!users.loading} fallback={<p class="text-slate-400">{t("admin.loadingUsers")}</p>}>
               <Show
                 when={(users() ?? []).length > 0}
                 fallback={
                   <div class="flex flex-col items-center justify-center gap-4 py-20 text-center">
                     <Users class="h-16 w-16 text-slate-600" />
-                    <p class="text-lg font-medium text-slate-300">No users yet</p>
+                    <p class="text-lg font-medium text-slate-300">{t("admin.noUsers")}</p>
                   </div>
                 }
               >
@@ -700,12 +701,12 @@ const UserManagement: Component = () => {
                   <table class="w-full text-sm">
                     <thead>
                       <tr class="border-b border-slate-700 bg-slate-800/50">
-                        <th class="px-4 py-3 text-left font-medium text-slate-400">Username</th>
-                        <th class="px-4 py-3 text-left font-medium text-slate-400">Name</th>
-                        <th class="px-4 py-3 text-left font-medium text-slate-400">Email</th>
-                        <th class="px-4 py-3 text-left font-medium text-slate-400">Role</th>
-                        <th class="px-4 py-3 text-left font-medium text-slate-400">Status</th>
-                        <th class="px-4 py-3 text-right font-medium text-slate-400">Actions</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-400">{t("admin.username")}</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-400">{t("admin.name")}</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-400">{t("admin.email")}</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-400">{t("admin.role")}</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-400">{t("admin.status")}</th>
+                        <th class="px-4 py-3 text-right font-medium text-slate-400">{t("admin.actions")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -734,14 +735,14 @@ const UserManagement: Component = () => {
                                     : "bg-red-600/20 text-red-300"
                                 }`}
                               >
-                                {user.enabled ? "Active" : "Disabled"}
+                                {user.enabled ? t("admin.active") : t("admin.disabled")}
                               </span>
                             </td>
                             <td class="px-4 py-3">
                               <div class="flex items-center justify-end gap-1">
                                 <button
                                   onClick={() => setDialog({ type: "edit", userId: user.id })}
-                                  title="Edit user"
+                                  title={t("admin.editUser")}
                                   class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
                                 >
                                   <Pencil class="h-4 w-4" />
@@ -750,7 +751,7 @@ const UserManagement: Component = () => {
                                   onClick={() =>
                                     setDialog({ type: "resetPassword", userId: user.id, username: user.username })
                                   }
-                                  title="Reset password"
+                                  title={t("admin.resetPassword")}
                                   class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
                                 >
                                   <KeyRound class="h-4 w-4" />
@@ -760,7 +761,7 @@ const UserManagement: Component = () => {
                                     onClick={() =>
                                       setDialog({ type: "delete", userId: user.id, username: user.username })
                                     }
-                                    title="Delete user"
+                                    title={t("admin.deleteUser")}
                                     class="rounded-lg p-1.5 text-slate-400 hover:bg-red-900/50 hover:text-red-300 transition-colors"
                                   >
                                     <Trash2 class="h-4 w-4" />

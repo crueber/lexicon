@@ -5,6 +5,7 @@ import { useAuth } from "./AuthProvider";
 import { ApiError } from "../../shared/api/client";
 import Button from "../../shared/ui/Button";
 import Input from "../../shared/ui/Input";
+import { t } from "../../shared/i18n/i18n";
 
 const LoginPage: Component = () => {
   const auth = useAuth();
@@ -27,12 +28,12 @@ const LoginPage: Component = () => {
       if (err instanceof ApiError) {
         try {
           const body = JSON.parse(err.body) as { error?: string };
-          setError(body.error ?? "Login failed");
+          setError(body.error ?? t("auth.loginFailed"));
         } catch {
-          setError("Login failed");
+          setError(t("auth.loginFailed"));
         }
       } else {
-        setError("Unable to connect to server");
+        setError(t("auth.connectionError"));
       }
     } finally {
       setSubmitting(false);
@@ -45,18 +46,18 @@ const LoginPage: Component = () => {
         <div class="flex flex-col items-center gap-6 mb-8">
           <BookOpen class="h-14 w-14 text-indigo-400" />
           <h1 class="text-3xl font-bold tracking-tight text-slate-100">
-            Lexicon
+            {t("auth.loginTitle")}
           </h1>
           <p class="text-sm text-slate-400">
-            Sign in to your library
+            {t("auth.signInPrompt")}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} class="flex flex-col gap-4">
           <Input
-            label="Username"
+            label={t("common.username")}
             type="text"
-            placeholder="Enter your username"
+            placeholder={t("common.enterYourUsername")}
             value={username()}
             onInput={(e) => setUsername(e.currentTarget.value)}
             autocomplete="username"
@@ -64,9 +65,9 @@ const LoginPage: Component = () => {
           />
 
           <Input
-            label="Password"
+            label={t("common.password")}
             type="password"
-            placeholder="Enter your password"
+            placeholder={t("common.enterYourPassword")}
             value={password()}
             onInput={(e) => setPassword(e.currentTarget.value)}
             autocomplete="current-password"
@@ -86,7 +87,7 @@ const LoginPage: Component = () => {
             loading={submitting()}
             class="mt-2 w-full"
           >
-            Sign in
+            {t("common.signIn")}
           </Button>
         </form>
       </div>

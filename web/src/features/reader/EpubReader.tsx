@@ -22,6 +22,7 @@ import {
   Trash2,
 } from "lucide-solid";
 import { api, getAccessToken } from "../../shared/api/client";
+import { t } from "../../shared/i18n/i18n";
 
 // ---- Types ----
 
@@ -343,14 +344,14 @@ const EpubReader: Component = () => {
   onMount(async () => {
     const fileId = searchParams.fileId;
     if (!fileId) {
-      setError("No file specified");
+      setError(t("reader.noFileSpecified"));
       setLoading(false);
       return;
     }
 
     const token = getAccessToken();
     if (!token) {
-      setError("Not authenticated");
+      setError(t("reader.notAuthenticated"));
       setLoading(false);
       return;
     }
@@ -478,7 +479,7 @@ const EpubReader: Component = () => {
       setLoading(false);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to load EPUB",
+        err instanceof Error ? err.message : t("reader.failedToLoadEPUB"),
       );
       setLoading(false);
     }
@@ -623,7 +624,7 @@ const EpubReader: Component = () => {
         <div class="absolute inset-0 z-50 flex items-center justify-center bg-slate-950">
           <div class="flex flex-col items-center gap-3 text-slate-400">
             <BookOpen class="h-10 w-10 animate-pulse text-indigo-400" />
-            <p class="text-sm">Loading book…</p>
+            <p class="text-sm">{t("reader.loadingBook")}</p>
           </div>
         </div>
       </Show>
@@ -637,7 +638,7 @@ const EpubReader: Component = () => {
               onClick={() => navigate(-1)}
               class="text-sm text-slate-400 hover:text-slate-200 transition-colors"
             >
-              ← Go back
+              {t("common.goBack")}
             </button>
           </div>
         </div>
@@ -655,7 +656,7 @@ const EpubReader: Component = () => {
           class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
         >
           <ArrowLeft class="h-4 w-4" />
-          <span class="hidden sm:inline">Back</span>
+          <span class="hidden sm:inline">{t("reader.back")}</span>
         </button>
 
         <div class="flex min-w-0 flex-1 flex-col items-center px-4">
@@ -680,7 +681,7 @@ const EpubReader: Component = () => {
               setShowSettings(false);
             }}
             class="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
-            title="Annotations"
+            title={t("reader.annotations")}
           >
             <Highlighter class="h-4 w-4" />
           </button>
@@ -691,7 +692,7 @@ const EpubReader: Component = () => {
               setShowAnnotations(false);
             }}
             class="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
-            title="Table of contents"
+            title={t("reader.tableOfContents")}
           >
             <List class="h-4 w-4" />
           </button>
@@ -702,7 +703,7 @@ const EpubReader: Component = () => {
               setShowAnnotations(false);
             }}
             class="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
-            title="Reader settings"
+            title={t("reader.readerSettingsTitle")}
           >
             <Settings class="h-4 w-4" />
           </button>
@@ -730,7 +731,7 @@ const EpubReader: Component = () => {
               <button
                 onClick={() => handleHighlightColor(color)}
                 class={`h-6 w-6 rounded-full transition-transform hover:scale-110 ${colorDotClasses[color]}`}
-                title={`Highlight ${color}`}
+                title={`${t("reader.highlight")} ${color}`}
               />
             )}
           </For>
@@ -749,7 +750,7 @@ const EpubReader: Component = () => {
           class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
         >
           <ChevronLeft class="h-4 w-4" />
-          <span class="hidden sm:inline">Previous</span>
+          <span class="hidden sm:inline">{t("reader.previous")}</span>
         </button>
 
         <div class="flex items-center gap-2">
@@ -767,7 +768,7 @@ const EpubReader: Component = () => {
           onClick={nextPage}
           class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
         >
-          <span class="hidden sm:inline">Next</span>
+          <span class="hidden sm:inline">{t("reader.next")}</span>
           <ChevronRight class="h-4 w-4" />
         </button>
       </div>
@@ -780,7 +781,7 @@ const EpubReader: Component = () => {
         style={{ background: "rgba(15,15,30,0.95)", "backdrop-filter": "blur(12px)" }}
       >
         <div class="flex items-center justify-between border-b border-white/10 px-4 py-3">
-          <h2 class="text-sm font-semibold text-slate-200">Contents</h2>
+          <h2 class="text-sm font-semibold text-slate-200">{t("reader.contents")}</h2>
           <button
             onClick={() => setShowToc(false)}
             class="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
@@ -789,7 +790,7 @@ const EpubReader: Component = () => {
           </button>
         </div>
         <nav class="p-2">
-          <For each={toc()} fallback={<p class="px-2 py-4 text-sm text-slate-500">No chapters found</p>}>
+          <For each={toc()} fallback={<p class="px-2 py-4 text-sm text-slate-500">{t("reader.noChaptersFound")}</p>}>
             {(item) => (
               <button
                 onClick={() => navigateToTocItem(item.href)}
@@ -811,7 +812,7 @@ const EpubReader: Component = () => {
       >
         <div class="flex items-center justify-between border-b border-white/10 px-4 py-3">
           <h2 class="text-sm font-semibold text-slate-200">
-            Highlights ({annotations().length})
+            {t("reader.highlights")} ({annotations().length})
           </h2>
           <button
             onClick={() => setShowAnnotations(false)}
@@ -825,7 +826,7 @@ const EpubReader: Component = () => {
             when={annotations().length > 0}
             fallback={
               <p class="px-2 py-4 text-sm text-slate-500">
-                Select text to create a highlight
+                {t("reader.selectTextToCreateHighlight")}
               </p>
             }
           >
@@ -853,7 +854,7 @@ const EpubReader: Component = () => {
                     <button
                       onClick={() => handleDeleteAnnotation(annotation)}
                       class="shrink-0 rounded p-1 text-slate-500 hover:bg-white/10 hover:text-red-400 transition-colors"
-                      title="Delete"
+                      title={t("common.delete")}
                     >
                       <Trash2 class="h-3.5 w-3.5" />
                     </button>
@@ -873,7 +874,7 @@ const EpubReader: Component = () => {
         style={{ background: "rgba(15,15,30,0.95)", "backdrop-filter": "blur(12px)" }}
       >
         <div class="flex items-center justify-between border-b border-white/10 px-4 py-3">
-          <h2 class="text-sm font-semibold text-slate-200">Reader Settings</h2>
+          <h2 class="text-sm font-semibold text-slate-200">{t("reader.readerSettings")}</h2>
           <button
             onClick={() => setShowSettings(false)}
             class="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
@@ -886,23 +887,23 @@ const EpubReader: Component = () => {
           {/* Theme */}
           <div class="flex flex-col gap-2">
             <label class="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Theme
+              {t("reader.theme")}
             </label>
             <div class="flex gap-2">
               <ThemeButton
-                label="Light"
+                label={t("reader.lightTheme")}
                 icon={<Sun class="h-4 w-4" />}
                 active={settings().theme === "light"}
                 onClick={() => updateSetting("theme", "light")}
               />
               <ThemeButton
-                label="Sepia"
+                label={t("reader.sepiaTheme")}
                 icon={<BookOpen class="h-4 w-4" />}
                 active={settings().theme === "sepia"}
                 onClick={() => updateSetting("theme", "sepia")}
               />
               <ThemeButton
-                label="Dark"
+                label={t("reader.darkTheme")}
                 icon={<Moon class="h-4 w-4" />}
                 active={settings().theme === "dark"}
                 onClick={() => updateSetting("theme", "dark")}
@@ -913,15 +914,15 @@ const EpubReader: Component = () => {
           {/* Font family */}
           <div class="flex flex-col gap-2">
             <label class="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Font
+              {t("reader.font")}
             </label>
             <div class="flex flex-col gap-1">
               <For
                 each={
                   [
-                    { value: "serif", label: "Serif" },
-                    { value: "sans-serif", label: "Sans-serif" },
-                    { value: "monospace", label: "Monospace" },
+                    { value: "serif", label: t("reader.serif") },
+                    { value: "sans-serif", label: t("reader.sansSerif") },
+                    { value: "monospace", label: t("reader.monospace") },
                   ] as const
                 }
               >
@@ -944,7 +945,7 @@ const EpubReader: Component = () => {
           {/* Font size */}
           <div class="flex flex-col gap-2">
             <label class="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Font Size: {settings().fontSize}px
+              {t("reader.fontSize")}: {settings().fontSize}px
             </label>
             <input
               type="range"
@@ -962,7 +963,7 @@ const EpubReader: Component = () => {
           {/* Line height */}
           <div class="flex flex-col gap-2">
             <label class="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Line Height: {settings().lineHeight?.toFixed(1)}
+              {t("reader.lineHeight")}: {settings().lineHeight?.toFixed(1)}
             </label>
             <input
               type="range"
@@ -980,15 +981,15 @@ const EpubReader: Component = () => {
           {/* Margins */}
           <div class="flex flex-col gap-2">
             <label class="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Margins
+              {t("reader.margins")}
             </label>
             <div class="flex gap-2">
               <For
                 each={
                   [
-                    { value: "small", label: "S" },
-                    { value: "medium", label: "M" },
-                    { value: "large", label: "L" },
+                    { value: "small", label: t("reader.small") },
+                    { value: "medium", label: t("reader.medium") },
+                    { value: "large", label: t("reader.large") },
                   ] as const
                 }
               >
@@ -1011,7 +1012,7 @@ const EpubReader: Component = () => {
           {/* Flow */}
           <div class="flex flex-col gap-2">
             <label class="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Layout
+              {t("reader.layout")}
             </label>
             <div class="flex gap-2">
               <button
@@ -1022,7 +1023,7 @@ const EpubReader: Component = () => {
                     : "text-slate-400 hover:bg-white/10 hover:text-slate-200"
                 }`}
               >
-                Paginated
+                {t("reader.paginated")}
               </button>
               <button
                 onClick={() => updateSetting("flow", "scrolled")}
@@ -1032,7 +1033,7 @@ const EpubReader: Component = () => {
                     : "text-slate-400 hover:bg-white/10 hover:text-slate-200"
                 }`}
               >
-                Scrolled
+                {t("reader.scrolled")}
               </button>
             </div>
           </div>

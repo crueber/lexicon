@@ -2,6 +2,7 @@ import { type Component, createSignal, Show, For, onMount } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { ChevronLeft, ChevronRight } from "lucide-solid";
 import BookCard from "../book/BookCard";
+import { t } from "../../shared/i18n/i18n";
 import type { Book } from "../library/types";
 
 interface ScrollerRowProps {
@@ -50,7 +51,7 @@ const ScrollerRow: Component<ScrollerRowProps> = (props) => {
             href={props.seeAllHref}
             class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
           >
-            See all
+            {t("common.seeAll")}
           </a>
         </Show>
       </div>
@@ -60,7 +61,7 @@ const ScrollerRow: Component<ScrollerRowProps> = (props) => {
         when={props.books.length > 0}
         fallback={
           <div class="flex h-32 items-center justify-center rounded-lg border border-slate-700/50 bg-slate-800/30">
-            <p class="text-sm text-slate-500">No books yet</p>
+            <p class="text-sm text-slate-500">{t("common.noBooksYet")}</p>
           </div>
         }
       >
@@ -70,7 +71,7 @@ const ScrollerRow: Component<ScrollerRowProps> = (props) => {
             <button
               onClick={scrollLeft}
               class="absolute left-0 top-1/2 z-10 -translate-y-1/2 -translate-x-2 flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 shadow-lg opacity-0 group-hover/row:opacity-100 transition-opacity hover:bg-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-              aria-label="Scroll left"
+              aria-label={t("common.scrollLeft")}
             >
               <ChevronLeft class="h-4 w-4 text-slate-200" />
             </button>
@@ -104,7 +105,7 @@ const ScrollerRow: Component<ScrollerRowProps> = (props) => {
             <button
               onClick={scrollRight}
               class="absolute right-0 top-1/2 z-10 -translate-y-1/2 translate-x-2 flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 shadow-lg opacity-0 group-hover/row:opacity-100 transition-opacity hover:bg-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-              aria-label="Scroll right"
+              aria-label={t("common.scrollRight")}
             >
               <ChevronRight class="h-4 w-4 text-slate-200" />
             </button>

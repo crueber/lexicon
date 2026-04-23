@@ -13,6 +13,7 @@ import {
   Notebook as NotebookIcon,
   ClipboardList,
 } from "lucide-solid";
+import { t } from "./shared/i18n/i18n";
 import AuthProvider, { useAuth } from "./features/auth/AuthProvider";
 import LoginPage from "./features/auth/LoginPage";
 import ProtectedRoute from "./features/auth/ProtectedRoute";
@@ -38,7 +39,7 @@ import WSProvider from "./shared/ws/WSProvider";
 
 const AdminSettingsStub: Component = () => (
   <div class="flex flex-1 items-center justify-center p-8">
-    <p class="text-slate-400">Admin Settings — coming soon</p>
+    <p class="text-slate-400">{t("common.adminSettingsComingSoon")}</p>
   </div>
 );
 
@@ -87,20 +88,20 @@ const Sidebar: Component = () => {
 
       {/* Navigation */}
       <nav class="flex flex-1 flex-col gap-1 px-3 py-4">
-        <NavItem href="/" icon={LayoutDashboard} label="Dashboard" />
-        <NavItem href="/libraries" icon={Library} label="Libraries" />
-        <NavItem href="/shelves" icon={BookMarked} label="Shelves" />
-        <NavItem href="/notebook" icon={NotebookIcon} label="Notebook" />
+        <NavItem href="/" icon={LayoutDashboard} label={t("common.dashboard")} />
+        <NavItem href="/libraries" icon={Library} label={t("common.libraries")} />
+        <NavItem href="/shelves" icon={BookMarked} label={t("common.shelves")} />
+        <NavItem href="/notebook" icon={NotebookIcon} label={t("common.notebook")} />
 
         <Show when={auth.isAdmin()}>
           <div class="mt-6 mb-2 px-3">
             <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Admin
+              {t("common.admin")}
             </span>
           </div>
-          <NavItem href="/admin/users" icon={Users} label="Users" />
-          <NavItem href="/admin/audit-logs" icon={ClipboardList} label="Audit Logs" />
-          <NavItem href="/admin/settings" icon={Settings} label="Settings" />
+          <NavItem href="/admin/users" icon={Users} label={t("common.users")} />
+          <NavItem href="/admin/audit-logs" icon={ClipboardList} label={t("common.auditLogs")} />
+          <NavItem href="/admin/settings" icon={Settings} label={t("common.settings")} />
         </Show>
       </nav>
 
@@ -123,7 +124,7 @@ const Sidebar: Component = () => {
           <button
             onClick={() => auth.logout()}
             class="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
-            title="Sign out"
+            title={t("common.signOut")}
           >
             <LogOut class="h-4 w-4" />
           </button>
@@ -143,10 +144,10 @@ const MobileNav: Component = () => {
     <>
       {/* Bottom navigation bar */}
       <nav class="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-slate-800 bg-slate-900 px-2 py-2 md:hidden">
-        <MobileNavItem href="/" icon={LayoutDashboard} label="Home" />
-        <MobileNavItem href="/libraries" icon={Library} label="Libraries" />
-        <MobileNavItem href="/shelves" icon={BookMarked} label="Shelves" />
-        <MobileNavItem href="/notebook" icon={NotebookIcon} label="Notebook" />
+        <MobileNavItem href="/" icon={LayoutDashboard} label={t("common.home")} />
+        <MobileNavItem href="/libraries" icon={Library} label={t("common.libraries")} />
+        <MobileNavItem href="/shelves" icon={BookMarked} label={t("common.shelves")} />
+        <MobileNavItem href="/notebook" icon={NotebookIcon} label={t("common.notebook")} />
         <button
           onClick={() => setMenuOpen((v) => !v)}
           class="flex flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 text-slate-400 hover:text-slate-200 transition-colors"
@@ -154,7 +155,7 @@ const MobileNav: Component = () => {
           <Show when={menuOpen()} fallback={<Menu class="h-5 w-5" />}>
             <X class="h-5 w-5" />
           </Show>
-          <span class="text-[10px]">More</span>
+          <span class="text-[10px]">{t("common.more")}</span>
         </button>
       </nav>
 
@@ -168,14 +169,14 @@ const MobileNav: Component = () => {
           <div class="flex flex-col gap-2">
             <Show when={auth.isAdmin()}>
               <p class="px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Admin
+                {t("common.admin")}
               </p>
-              <NavItem href="/admin/users" icon={Users} label="Users" onClick={() => setMenuOpen(false)} />
-              <NavItem href="/admin/audit-logs" icon={ClipboardList} label="Audit Logs" onClick={() => setMenuOpen(false)} />
-              <NavItem href="/admin/settings" icon={Settings} label="Settings" onClick={() => setMenuOpen(false)} />
+              <NavItem href="/admin/users" icon={Users} label={t("common.users")} onClick={() => setMenuOpen(false)} />
+              <NavItem href="/admin/audit-logs" icon={ClipboardList} label={t("common.auditLogs")} onClick={() => setMenuOpen(false)} />
+              <NavItem href="/admin/settings" icon={Settings} label={t("common.settings")} onClick={() => setMenuOpen(false)} />
               <div class="my-2 border-t border-slate-800" />
             </Show>
-            <NavItem href="/settings" icon={Settings} label="Settings" onClick={() => setMenuOpen(false)} />
+            <NavItem href="/settings" icon={Settings} label={t("common.settings")} onClick={() => setMenuOpen(false)} />
             <button
               onClick={() => {
                 setMenuOpen(false);
@@ -184,7 +185,7 @@ const MobileNav: Component = () => {
               class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-400 hover:bg-slate-800 transition-colors"
             >
               <LogOut class="h-5 w-5 shrink-0" />
-              <span>Sign out</span>
+              <span>{t("common.signOut")}</span>
             </button>
           </div>
         </div>

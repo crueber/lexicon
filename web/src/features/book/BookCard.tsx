@@ -1,5 +1,6 @@
 import { type Component, createSignal, Show } from "solid-js";
 import { BookOpen, Headphones, BookImage } from "lucide-solid";
+import { t } from "../../shared/i18n/i18n";
 import type { Book } from "../library/types";
 
 interface BookCardProps {
@@ -18,7 +19,7 @@ const BookTypeBadge: Component<{ bookType: Book["bookType"] }> = (props) => {
             : "bg-amber-600/90 text-amber-100"
         }`}
       >
-        {props.bookType === "AUDIOBOOK" ? "Audio" : "Comic"}
+        {props.bookType === "AUDIOBOOK" ? t("common.audio") : t("common.comic")}
       </span>
     </Show>
   );
@@ -66,7 +67,7 @@ const BookCard: Component<BookCardProps> = (props) => {
         >
           <img
             src={`/api/books/${props.book.id}/cover/thumbnail`}
-            alt={props.book.title ?? "Book cover"}
+            alt={props.book.title ?? t("common.bookCover")}
             loading="lazy"
             class="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
             onError={() => setImgError(true)}
@@ -78,7 +79,7 @@ const BookCard: Component<BookCardProps> = (props) => {
       {/* Title */}
       <div class="min-w-0 flex-1">
         <p class="line-clamp-2 text-xs font-medium leading-tight text-slate-100">
-          {props.book.title ?? "Untitled"}
+          {props.book.title ?? t("common.untitled")}
         </p>
         <Show when={props.book.authors.length > 0}>
           <p class="mt-0.5 truncate text-[11px] text-slate-400">

@@ -2,6 +2,7 @@ import { type Component, createResource, Show } from "solid-js";
 import { useParams, useNavigate, Navigate } from "@solidjs/router";
 import { Loader2 } from "lucide-solid";
 import { api } from "../../shared/api/client";
+import { t } from "../../shared/i18n/i18n";
 import type { BookFile } from "../library/types";
 
 // Fetch the list of files for a book.
@@ -83,17 +84,17 @@ const ReaderDispatch: Component = () => {
             fallback={
               <div class="flex flex-col items-center gap-3 text-slate-400">
                 <Loader2 class="h-8 w-8 animate-spin text-indigo-400" />
-                <p class="text-sm">Loading book…</p>
+                <p class="text-sm">{t("common.loadingBook")}</p>
               </div>
             }
           >
             <div class="flex flex-col items-center gap-3 text-center">
-              <p class="text-lg font-medium text-red-400">Failed to load book</p>
+              <p class="text-lg font-medium text-red-400">{t("reader.failedToLoadBook")}</p>
               <button
                 onClick={() => navigate(-1)}
                 class="text-sm text-slate-400 hover:text-slate-200 transition-colors"
               >
-                ← Go back
+                {t("common.goBack")}
               </button>
             </div>
           </Show>
@@ -103,12 +104,12 @@ const ReaderDispatch: Component = () => {
           when={redirectTarget()}
           fallback={
             <div class="flex flex-col items-center gap-3 text-center">
-              <p class="text-lg font-medium text-slate-300">No readable files found</p>
+              <p class="text-lg font-medium text-slate-300">{t("reader.noReadableFilesFound")}</p>
               <button
                 onClick={() => navigate(-1)}
                 class="text-sm text-slate-400 hover:text-slate-200 transition-colors"
               >
-                ← Go back
+                {t("common.goBack")}
               </button>
             </div>
           }

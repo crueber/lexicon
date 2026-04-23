@@ -26,6 +26,7 @@ import Button from "../../shared/ui/Button";
 import Skeleton from "../../shared/ui/Skeleton";
 import AddToShelfDialog from "../shelf/AddToShelfDialog";
 import MetadataSearch from "./MetadataSearch";
+import { t } from "../../shared/i18n/i18n";
 import type { BookDetail as BookDetailType, BookFile, Shelf, SimilarBook } from "../library/types";
 
 // ---- API ----
@@ -144,14 +145,14 @@ const SimilarBooksSection: Component<{ bookId: number }> = (props) => {
   return (
     <div class="flex flex-col gap-3">
       <span class="text-xs font-medium uppercase tracking-wide text-slate-500">
-        Similar Books
+        {t("book.similarBooks")}
       </span>
       <Suspense fallback={<div class="h-24 animate-pulse rounded-lg bg-slate-800" />}>
         <Show
           when={(similarBooks() ?? []).length > 0}
           fallback={
             <p class="text-sm text-slate-500">
-              No recommendations yet. Run a vector rebuild task.
+              {t("book.noRecommendations")}
             </p>
           }
         >
@@ -171,16 +172,16 @@ const SimilarBooksSection: Component<{ bookId: number }> = (props) => {
                     >
                       <img
                         src={`/api/books/${similarBook.id}/cover`}
-                        alt={similarBook.title ?? "Book cover"}
+                        alt={similarBook.title ?? t("common.bookCover")}
                         class="h-full w-full object-cover"
                       />
                     </Show>
                   </div>
                   <p class="line-clamp-2 text-xs font-medium text-slate-200">
-                    {similarBook.title ?? "Untitled"}
+                    {similarBook.title ?? t("common.untitled")}
                   </p>
                   <p class="text-xs text-slate-500">
-                    {Math.round(similarBook.similarity * 100)}% match
+                    {Math.round(similarBook.similarity * 100)}{t("book.percentMatch")}
                   </p>
                 </button>
               )}
@@ -283,7 +284,7 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
               onClick={() => navigate(-1)}
               class="text-sm text-slate-400 hover:text-slate-200 transition-colors"
             >
-              ← Back
+              {t("book.back")}
             </button>
             <div class="flex items-center gap-2">
               <Button
@@ -292,7 +293,7 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
                 onClick={() => navigate(`/books/${props.bookId}/read`)}
               >
                 <BookOpenCheck class="h-4 w-4" />
-                Read
+                {t("book.read")}
               </Button>
               <Button
                 variant="secondary"
@@ -300,7 +301,7 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
                 onClick={() => setShowShelfDialog(true)}
               >
                 <BookMarked class="h-4 w-4" />
-                Add to Shelf
+                {t("book.addToShelf")}
               </Button>
               <Button
                 variant="secondary"
@@ -308,28 +309,28 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
                 onClick={() => setShowMetadataSearch(true)}
               >
                 <Search class="h-4 w-4" />
-                Find Metadata
+                {t("book.findMetadata")}
               </Button>
               <Show when={auth.isAdmin()}>
                 <Show
                   when={!showDeleteConfirm()}
                   fallback={
                     <div class="flex items-center gap-2">
-                      <span class="text-sm text-slate-400">Are you sure?</span>
+                      <span class="text-sm text-slate-400">{t("book.areYouSure")}</span>
                       <Button
                         variant="danger"
                         size="sm"
                         onClick={handleDelete}
                         loading={deleting()}
                       >
-                        Delete
+                        {t("common.delete")}
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setShowDeleteConfirm(false)}
                       >
-                        Cancel
+                        {t("common.cancel")}
                       </Button>
                     </div>
                   }
@@ -340,7 +341,7 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
                     onClick={() => setShowDeleteConfirm(true)}
                   >
                     <Trash2 class="h-4 w-4" />
-                    Delete
+                    {t("common.delete")}
                   </Button>
                 </Show>
               </Show>
@@ -362,7 +363,7 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
                 >
                   <img
                     src={`/api/books/${props.bookId}/cover`}
-                    alt={b().metadata?.title ?? b().title ?? "Book cover"}
+                    alt={b().metadata?.title ?? b().title ?? t("common.bookCover")}
                     class="h-full w-full object-cover"
                     onError={() => setImgError(true)}
                   />
@@ -384,7 +385,7 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
               {/* Title & subtitle */}
               <div>
                 <h1 class="text-2xl font-bold leading-tight text-slate-100 md:text-3xl">
-                  {b().metadata?.title ?? b().title ?? "Untitled"}
+                  {b().metadata?.title ?? b().title ?? t("common.untitled")}
                 </h1>
                 <Show when={b().metadata?.subtitle}>
                   <p class="mt-1 text-lg text-slate-400">
@@ -434,12 +435,12 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
                       when={descExpanded()}
                       fallback={
                         <>
-                          Show more <ChevronDown class="h-3 w-3" />
+                          {t("book.showMore")} <ChevronDown class="h-3 w-3" />
                         </>
                       }
                     >
                       <>
-                        Show less <ChevronUp class="h-3 w-3" />
+                        {t("book.showLess")} <ChevronUp class="h-3 w-3" />
                       </>
                     </Show>
                   </button>
@@ -449,31 +450,31 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
               {/* Metadata grid */}
               <div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
                 <Show when={b().metadata?.publisher}>
-                  <MetaRow label="Publisher" value={b().metadata!.publisher!} />
+                  <MetaRow label={t("book.publisher")} value={b().metadata!.publisher!} />
                 </Show>
                 <Show when={b().metadata?.publishDate}>
                   <MetaRow
-                    label="Published"
+                    label={t("book.published")}
                     value={b().metadata!.publishDate!}
                   />
                 </Show>
                 <Show when={b().metadata?.language}>
-                  <MetaRow label="Language" value={b().metadata!.language!} />
+                  <MetaRow label={t("book.language")} value={b().metadata!.language!} />
                 </Show>
                 <Show when={b().metadata?.pageCount !== undefined}>
                   <MetaRow
-                    label="Pages"
+                    label={t("book.pageCount")}
                     value={String(b().metadata!.pageCount)}
                   />
                 </Show>
                 <Show when={b().metadata?.isbn13}>
-                  <MetaRow label="ISBN-13" value={b().metadata!.isbn13!} />
+                  <MetaRow label={t("book.isbn13")} value={b().metadata!.isbn13!} />
                 </Show>
                 <Show when={b().metadata?.isbn10}>
-                  <MetaRow label="ISBN-10" value={b().metadata!.isbn10!} />
+                  <MetaRow label={t("book.isbn10")} value={b().metadata!.isbn10!} />
                 </Show>
                 <Show when={b().addedDate}>
-                  <MetaRow label="Added" value={b().addedDate!} />
+                  <MetaRow label={t("book.added")} value={b().addedDate!} />
                 </Show>
               </div>
 
@@ -481,7 +482,7 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
               <Show when={(b().categories ?? []).length > 0}>
                 <div class="flex flex-col gap-2">
                   <span class="text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Categories
+                    {t("book.categories")}
                   </span>
                   <div class="flex flex-wrap gap-2">
                     <For each={b().categories}>
@@ -499,7 +500,7 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
               <Show when={(b().tags ?? []).length > 0}>
                 <div class="flex flex-col gap-2">
                   <span class="text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Tags
+                    {t("book.tags")}
                   </span>
                   <div class="flex flex-wrap gap-2">
                     <For each={b().tags}>
@@ -517,7 +518,7 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
               <Show when={(b().files ?? []).length > 0}>
                 <div class="flex flex-col gap-2">
                   <span class="text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Files
+                    {t("book.files")}
                   </span>
                   <div class="flex flex-col gap-2">
                     <For each={b().files}>
@@ -531,7 +532,7 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
               <Show when={(bookShelves() ?? []).length > 0}>
                 <div class="flex flex-col gap-2">
                   <span class="text-xs font-medium uppercase tracking-wide text-slate-500">
-                    In Shelves
+                    {t("book.inShelves")}
                   </span>
                   <div class="flex flex-wrap gap-2">
                     <For each={bookShelves() ?? []}>
@@ -593,7 +594,7 @@ const BookDetail: Component = () => {
       fallback={(err) => (
         <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
           <p class="text-lg font-medium text-red-400">
-            {err.message.includes("404") ? "Book not found" : "Failed to load book"}
+            {err.message.includes("404") ? t("book.bookNotFound") : t("book.failedToLoadBook")}
           </p>
           <p class="text-sm text-slate-500">{err.message}</p>
         </div>

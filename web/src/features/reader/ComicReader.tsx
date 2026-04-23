@@ -17,6 +17,7 @@ import {
   BookOpen,
 } from "lucide-solid";
 import { api, getAccessToken } from "../../shared/api/client";
+import { t } from "../../shared/i18n/i18n";
 
 // ---- Types ----
 
@@ -316,14 +317,14 @@ const ComicReader: Component = () => {
     const rawFileId = searchParams.fileId;
     const fileId = Array.isArray(rawFileId) ? rawFileId[0] : rawFileId;
     if (!fileId) {
-      setError("No file specified");
+      setError(t("common.noFileSpecified"));
       setLoading(false);
       return;
     }
 
     const token = getAccessToken();
     if (!token) {
-      setError("Not authenticated");
+      setError(t("common.notAuthenticated"));
       setLoading(false);
       return;
     }
@@ -341,13 +342,13 @@ const ComicReader: Component = () => {
     try {
       pageList = await fetchPages(params.id, fileId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load comic");
+      setError(err instanceof Error ? err.message : t("reader.failedToLoadComic"));
       setLoading(false);
       return;
     }
 
     if (pageList.length === 0) {
-      setError("No pages found in this comic");
+      setError(t("reader.noPagesFound"));
       setLoading(false);
       return;
     }
@@ -417,7 +418,7 @@ const ComicReader: Component = () => {
         <div class="absolute inset-0 z-50 flex items-center justify-center bg-slate-950">
           <div class="flex flex-col items-center gap-3 text-slate-400">
             <BookOpen class="h-10 w-10 animate-pulse text-indigo-400" />
-            <p class="text-sm">Loading comic…</p>
+            <p class="text-sm">{t("reader.loadingComic")}</p>
           </div>
         </div>
       </Show>
@@ -431,7 +432,7 @@ const ComicReader: Component = () => {
               onClick={() => navigate(-1)}
               class="text-sm text-slate-400 hover:text-slate-200 transition-colors"
             >
-              ← Go back
+              {t("common.goBack")}
             </button>
           </div>
         </div>
@@ -451,13 +452,13 @@ const ComicReader: Component = () => {
           class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
         >
           <ArrowLeft class="h-4 w-4" />
-          <span class="hidden sm:inline">Back</span>
+          <span class="hidden sm:inline">{t("common.back")}</span>
         </button>
 
         <div class="flex min-w-0 flex-1 flex-col items-center px-4">
           <Show when={totalPages() > 0}>
             <p class="text-sm font-medium text-slate-200">
-              Page {currentPage() + 1} of {totalPages()}
+              {t("common.page")} {currentPage() + 1} {t("common.of")} {totalPages()}
             </p>
           </Show>
         </div>
@@ -466,7 +467,7 @@ const ComicReader: Component = () => {
           <button
             onClick={() => setShowSettings((v) => !v)}
             class="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
-            title="Reader settings"
+            title={t("common.readerSettingsTitle")}
           >
             <Settings class="h-4 w-4" />
           </button>
@@ -484,7 +485,7 @@ const ComicReader: Component = () => {
             {/* Current page */}
             <img
               src={currentPageURL()!}
-              alt={`Page ${currentPage() + 1}`}
+              alt={`${t("common.page")} ${currentPage() + 1}`}
               style={imageFitStyle()}
               class="select-none"
               draggable={false}
@@ -493,7 +494,7 @@ const ComicReader: Component = () => {
             <Show when={isDoublePage() && nextPageURL()}>
               <img
                 src={nextPageURL()!}
-                alt={`Page ${currentPage() + 2}`}
+                alt={`${t("common.page")} ${currentPage() + 2}`}
                 style={imageFitStyle()}
                 class="select-none"
                 draggable={false}
@@ -542,7 +543,7 @@ const ComicReader: Component = () => {
           class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronLeft class="h-4 w-4" />
-          <span class="hidden sm:inline">Previous</span>
+          <span class="hidden sm:inline">{t("common.previous")}</span>
         </button>
 
         {/* Page number input */}
@@ -570,7 +571,7 @@ const ComicReader: Component = () => {
           }
           class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          <span class="hidden sm:inline">Next</span>
+          <span class="hidden sm:inline">{t("common.next")}</span>
           <ChevronRight class="h-4 w-4" />
         </button>
       </div>
@@ -586,7 +587,7 @@ const ComicReader: Component = () => {
         }}
       >
         <div class="flex items-center justify-between border-b border-white/10 px-4 py-3">
-          <h2 class="text-sm font-semibold text-slate-200">Reader Settings</h2>
+          <h2 class="text-sm font-semibold text-slate-200">{t("common.readerSettings")}</h2>
           <button
             onClick={() => setShowSettings(false)}
             class="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
@@ -599,7 +600,7 @@ const ComicReader: Component = () => {
           {/* Display mode */}
           <div class="flex flex-col gap-2">
             <label class="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Display Mode
+              {t("common.displayMode")}
             </label>
             <div class="flex gap-2">
               <button
@@ -610,7 +611,7 @@ const ComicReader: Component = () => {
                     : "text-slate-400 hover:bg-white/10 hover:text-slate-200"
                 }`}
               >
-                Single
+                {t("common.single")}
               </button>
               <button
                 onClick={() => updateSetting("displayMode", "double")}
@@ -620,7 +621,7 @@ const ComicReader: Component = () => {
                     : "text-slate-400 hover:bg-white/10 hover:text-slate-200"
                 }`}
               >
-                Double
+                {t("common.double")}
               </button>
             </div>
           </div>
@@ -628,15 +629,15 @@ const ComicReader: Component = () => {
           {/* Fit mode */}
           <div class="flex flex-col gap-2">
             <label class="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Fit Mode
+              {t("common.fitMode")}
             </label>
             <div class="flex flex-col gap-1">
               <For
                 each={
                   [
-                    { value: "width", label: "Fit Width" },
-                    { value: "height", label: "Fit Height" },
-                    { value: "original", label: "Original Size" },
+                    { value: "width", label: t("common.fitWidth") },
+                    { value: "height", label: t("common.fitHeight") },
+                    { value: "original", label: t("common.originalSize") },
                   ] as const
                 }
               >
@@ -659,7 +660,7 @@ const ComicReader: Component = () => {
           {/* Reading direction */}
           <div class="flex flex-col gap-2">
             <label class="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Reading Direction
+              {t("common.readingDirection")}
             </label>
             <div class="flex gap-2">
               <button
@@ -670,7 +671,7 @@ const ComicReader: Component = () => {
                     : "text-slate-400 hover:bg-white/10 hover:text-slate-200"
                 }`}
               >
-                LTR
+                {t("common.ltr")}
               </button>
               <button
                 onClick={() => updateSetting("readingDirection", "rtl")}
@@ -680,7 +681,7 @@ const ComicReader: Component = () => {
                     : "text-slate-400 hover:bg-white/10 hover:text-slate-200"
                 }`}
               >
-                RTL
+                {t("common.rtl")}
               </button>
             </div>
           </div>

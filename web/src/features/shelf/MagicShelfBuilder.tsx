@@ -13,6 +13,7 @@ import { Plus, Trash2, X, Wand2, ChevronDown } from "lucide-solid";
 import { api } from "../../shared/api/client";
 import Button from "../../shared/ui/Button";
 import Input from "../../shared/ui/Input";
+import { t } from "../../shared/i18n/i18n";
 import type { MagicShelf, RuleGroup, RuleItem } from "../library/types";
 
 // ---- Field and operator definitions ----
@@ -24,17 +25,17 @@ interface FieldDef {
 }
 
 const FIELDS: FieldDef[] = [
-  { value: "title", label: "Title", type: "text" },
-  { value: "author", label: "Author", type: "text" },
-  { value: "category", label: "Category", type: "text" },
-  { value: "tag", label: "Tag", type: "text" },
-  { value: "series", label: "Series", type: "text" },
-  { value: "language", label: "Language", type: "text" },
-  { value: "book_type", label: "Book Type", type: "text" },
-  { value: "format", label: "Format", type: "text" },
-  { value: "publisher", label: "Publisher", type: "text" },
-  { value: "added_date", label: "Added Date", type: "date" },
-  { value: "page_count", label: "Page Count", type: "number" },
+  { value: "title", label: t("common.title"), type: "text" },
+  { value: "author", label: t("common.author"), type: "text" },
+  { value: "category", label: t("common.category"), type: "text" },
+  { value: "tag", label: t("common.tag"), type: "text" },
+  { value: "series", label: t("common.series"), type: "text" },
+  { value: "language", label: t("common.language"), type: "text" },
+  { value: "book_type", label: t("common.bookType"), type: "text" },
+  { value: "format", label: t("common.format"), type: "text" },
+  { value: "publisher", label: t("common.publisher"), type: "text" },
+  { value: "added_date", label: t("common.addedDate"), type: "date" },
+  { value: "page_count", label: t("common.pageCount"), type: "number" },
 ];
 
 interface OperatorDef {
@@ -45,21 +46,21 @@ interface OperatorDef {
 }
 
 const OPERATORS: OperatorDef[] = [
-  { value: "contains", label: "Contains", types: ["text"] },
-  { value: "equals", label: "Equals", types: ["text", "number", "date"] },
-  { value: "starts_with", label: "Starts with", types: ["text"] },
-  { value: "ends_with", label: "Ends with", types: ["text"] },
-  { value: "greater_than", label: "After / Greater than", types: ["number", "date"] },
-  { value: "less_than", label: "Before / Less than", types: ["number", "date"] },
-  { value: "is_empty", label: "Is empty", types: ["text", "number", "date"], noValue: true },
-  { value: "is_not_empty", label: "Is not empty", types: ["text", "number", "date"], noValue: true },
+  { value: "contains", label: t("common.contains"), types: ["text"] },
+  { value: "equals", label: t("common.equals"), types: ["text", "number", "date"] },
+  { value: "starts_with", label: t("common.startsWith"), types: ["text"] },
+  { value: "ends_with", label: t("common.endsWith"), types: ["text"] },
+  { value: "greater_than", label: t("common.greaterThan"), types: ["number", "date"] },
+  { value: "less_than", label: t("common.lessThan"), types: ["number", "date"] },
+  { value: "is_empty", label: t("common.isEmpty"), types: ["text", "number", "date"], noValue: true },
+  { value: "is_not_empty", label: t("common.isNotEmpty"), types: ["text", "number", "date"], noValue: true },
 ];
 
 const SORT_FIELDS = [
-  { value: "added_date", label: "Added Date" },
-  { value: "title", label: "Title" },
-  { value: "author", label: "Author" },
-  { value: "page_count", label: "Page Count" },
+  { value: "added_date", label: t("common.addedDate") },
+  { value: "title", label: t("common.title") },
+  { value: "author", label: t("common.author") },
+  { value: "page_count", label: t("common.pageCount") },
 ];
 
 // ---- API ----
@@ -145,7 +146,7 @@ const RuleItemEditor: Component<{
           <button
             onClick={props.onRemove}
             class="ml-2 shrink-0 rounded p-1 text-slate-400 hover:bg-slate-700 hover:text-red-400 transition-colors"
-            title="Remove group"
+            title={t("common.removeGroup")}
           >
             <Trash2 class="h-4 w-4" />
           </button>
@@ -194,7 +195,7 @@ const RuleItemEditor: Component<{
           onInput={(e) =>
             props.onUpdate({ ...props.item, value: e.currentTarget.value })
           }
-          placeholder="Value"
+          placeholder={t("common.value")}
           class="min-w-0 flex-1 rounded-md bg-slate-700 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
       </Show>
@@ -203,7 +204,7 @@ const RuleItemEditor: Component<{
       <button
         onClick={props.onRemove}
         class="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-700 hover:text-red-400 transition-colors"
-        title="Remove condition"
+        title={t("common.removeCondition")}
       >
         <X class="h-4 w-4" />
       </button>
@@ -256,7 +257,7 @@ const RuleGroupEditor: Component<{
     <div class="flex flex-1 flex-col gap-2">
       {/* AND/OR toggle */}
       <div class="flex items-center gap-2">
-        <span class="text-xs font-medium text-slate-400">Match</span>
+        <span class="text-xs font-medium text-slate-400">{t("common.match")}</span>
         <div class="flex rounded-md overflow-hidden border border-slate-600">
           <button
             type="button"
@@ -267,7 +268,7 @@ const RuleGroupEditor: Component<{
                 : "bg-slate-700 text-slate-400 hover:text-slate-200"
             }`}
           >
-            ALL (AND)
+            {t("common.allAnd")}
           </button>
           <button
             type="button"
@@ -278,10 +279,10 @@ const RuleGroupEditor: Component<{
                 : "bg-slate-700 text-slate-400 hover:text-slate-200"
             }`}
           >
-            ANY (OR)
+            {t("common.anyOr")}
           </button>
         </div>
-        <span class="text-xs text-slate-400">of the following rules</span>
+        <span class="text-xs text-slate-400">{t("common.ofTheFollowingRules")}</span>
       </div>
 
       {/* Rule items */}
@@ -306,7 +307,7 @@ const RuleGroupEditor: Component<{
           class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-indigo-400 hover:bg-slate-700 hover:text-indigo-300 transition-colors"
         >
           <Plus class="h-3.5 w-3.5" />
-          Add condition
+          {t("common.addCondition")}
         </button>
         <Show when={props.depth < 2}>
           <button
@@ -315,7 +316,7 @@ const RuleGroupEditor: Component<{
             class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
           >
             <Plus class="h-3.5 w-3.5" />
-            Add group
+            {t("common.addGroup")}
           </button>
         </Show>
       </div>
@@ -399,7 +400,7 @@ const MagicShelfBuilderInner: Component<{ editId?: number }> = (props) => {
   async function handleSubmit(e: Event) {
     e.preventDefault();
     if (!name().trim()) {
-      setError("Name is required");
+      setError(t("common.nameRequired"));
       return;
     }
 
@@ -427,7 +428,7 @@ const MagicShelfBuilderInner: Component<{ editId?: number }> = (props) => {
         navigate(`/magic-shelves/${created.id}`);
       }
     } catch {
-      setError("Failed to save magic shelf. Please try again.");
+      setError(t("common.failedToSaveMagicShelf"));
     } finally {
       setSaving(false);
     }
@@ -444,12 +445,12 @@ const MagicShelfBuilderInner: Component<{ editId?: number }> = (props) => {
             onClick={() => navigate("/shelves")}
             class="text-sm text-slate-400 hover:text-slate-200 transition-colors"
           >
-            ← Shelves
+            ← {t("common.shelves")}
           </button>
           <div class="flex items-center gap-2">
             <Wand2 class="h-5 w-5 text-indigo-400" />
             <h1 class="text-xl font-bold text-slate-100">
-              {isEditing() ? "Edit Magic Shelf" : "New Magic Shelf"}
+              {isEditing() ? t("common.editMagicShelf") : t("common.newMagicShelf")}
             </h1>
           </div>
         </div>
@@ -460,31 +461,31 @@ const MagicShelfBuilderInner: Component<{ editId?: number }> = (props) => {
         {/* Basic info */}
         <div class="rounded-xl bg-slate-800 p-5">
           <h2 class="mb-4 text-sm font-semibold uppercase tracking-wider text-slate-400">
-            Basic Info
+            {t("common.basicInfo")}
           </h2>
           <div class="flex flex-col gap-4">
             <Input
-              label="Name"
-              placeholder="My Magic Shelf"
+              label={t("common.name")}
+              placeholder={t("common.placeholderShelfName")}
               value={name()}
               onInput={(e) => setName(e.currentTarget.value)}
               required
             />
             <Input
-              label="Description (optional)"
-              placeholder="Books matching my criteria"
+              label={t("common.descriptionOptional")}
+              placeholder={t("common.placeholderShelfDescription")}
               value={description()}
               onInput={(e) => setDescription(e.currentTarget.value)}
             />
             <div class="grid grid-cols-2 gap-4">
               <Input
-                label="Icon (emoji, optional)"
+                label={t("common.iconOptional")}
                 placeholder="✨"
                 value={icon()}
                 onInput={(e) => setIcon(e.currentTarget.value)}
               />
               <Input
-                label="Color (hex, optional)"
+                label={t("common.colorOptional")}
                 placeholder="#6366f1"
                 value={iconColor()}
                 onInput={(e) => setIconColor(e.currentTarget.value)}
@@ -496,7 +497,7 @@ const MagicShelfBuilderInner: Component<{ editId?: number }> = (props) => {
         {/* Rules */}
         <div class="rounded-xl bg-slate-800 p-5">
           <h2 class="mb-4 text-sm font-semibold uppercase tracking-wider text-slate-400">
-            Rules
+            {t("common.rules")}
           </h2>
           <RuleGroupEditor
             group={rules}
@@ -508,11 +509,11 @@ const MagicShelfBuilderInner: Component<{ editId?: number }> = (props) => {
         {/* Sort & Limit */}
         <div class="rounded-xl bg-slate-800 p-5">
           <h2 class="mb-4 text-sm font-semibold uppercase tracking-wider text-slate-400">
-            Sort & Limit
+            {t("common.sortAndLimit")}
           </h2>
           <div class="grid grid-cols-2 gap-4">
             <div class="flex flex-col gap-1.5">
-              <label class="text-sm font-medium text-slate-300">Sort by</label>
+              <label class="text-sm font-medium text-slate-300">{t("common.sortBy")}</label>
               <div class="relative">
                 <select
                   value={sortField()}
@@ -527,7 +528,7 @@ const MagicShelfBuilderInner: Component<{ editId?: number }> = (props) => {
               </div>
             </div>
             <div class="flex flex-col gap-1.5">
-              <label class="text-sm font-medium text-slate-300">Direction</label>
+              <label class="text-sm font-medium text-slate-300">{t("common.direction")}</label>
               <div class="flex rounded-md overflow-hidden border border-slate-600">
                 <button
                   type="button"
@@ -538,7 +539,7 @@ const MagicShelfBuilderInner: Component<{ editId?: number }> = (props) => {
                       : "bg-slate-700 text-slate-400 hover:text-slate-200"
                   }`}
                 >
-                  Descending
+                  {t("common.descending")}
                 </button>
                 <button
                   type="button"
@@ -549,7 +550,7 @@ const MagicShelfBuilderInner: Component<{ editId?: number }> = (props) => {
                       : "bg-slate-700 text-slate-400 hover:text-slate-200"
                   }`}
                 >
-                  Ascending
+                  {t("common.ascending")}
                 </button>
               </div>
             </div>
@@ -562,17 +563,17 @@ const MagicShelfBuilderInner: Component<{ editId?: number }> = (props) => {
             <Show
               when={!previewLoading()}
               fallback={
-                <p class="text-sm text-slate-400">Calculating matches…</p>
+                <p class="text-sm text-slate-400">{t("common.calculatingMatches")}</p>
               }
             >
               <Show
                 when={previewCount() !== null}
-                fallback={<p class="text-sm text-slate-500">Save to see preview count</p>}
+                fallback={<p class="text-sm text-slate-500">{t("common.saveToSeePreview")}</p>}
               >
                 <p class="text-sm text-slate-300">
-                  Matches{" "}
+                  {t("common.matches")}{" "}
                   <span class="font-bold text-indigo-400">{previewCount()}</span>{" "}
-                  {previewCount() === 1 ? "book" : "books"}
+                  {previewCount() === 1 ? t("common.book") : t("common.books")}
                 </p>
               </Show>
             </Show>
@@ -591,10 +592,10 @@ const MagicShelfBuilderInner: Component<{ editId?: number }> = (props) => {
             type="button"
             onClick={() => navigate("/shelves")}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button variant="primary" type="submit" loading={saving()}>
-            {isEditing() ? "Save Changes" : "Create Magic Shelf"}
+            {isEditing() ? t("common.saveChanges") : t("common.createMagicShelf")}
           </Button>
         </div>
       </form>

@@ -9,6 +9,7 @@ import { BookMarked, Check, Plus, X, Loader2 } from "lucide-solid";
 import { api } from "../../shared/api/client";
 import Button from "../../shared/ui/Button";
 import Input from "../../shared/ui/Input";
+import { t } from "../../shared/i18n/i18n";
 import type { Shelf } from "../library/types";
 
 // ---- API ----
@@ -107,7 +108,7 @@ const AddToShelfDialog: Component<AddToShelfDialogProps> = (props) => {
       void refetchShelves();
       void refetchBookShelves();
     } catch {
-      setCreateError("Failed to create shelf. Please try again.");
+      setCreateError(t("common.failedToCreateShelf"));
     } finally {
       setCreating(false);
     }
@@ -123,7 +124,7 @@ const AddToShelfDialog: Component<AddToShelfDialogProps> = (props) => {
       <div class="w-full max-w-sm rounded-xl bg-slate-800 shadow-2xl">
         {/* Header */}
         <div class="flex items-center justify-between border-b border-slate-700 px-5 py-4">
-          <h2 class="text-base font-semibold text-slate-100">Add to Shelf</h2>
+          <h2 class="text-base font-semibold text-slate-100">{t("book.addToShelf")}</h2>
           <button
             onClick={props.onClose}
             class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
@@ -147,7 +148,7 @@ const AddToShelfDialog: Component<AddToShelfDialogProps> = (props) => {
               fallback={
                 <div class="flex flex-col items-center gap-2 py-8 text-center">
                   <BookMarked class="h-8 w-8 text-slate-600" />
-                  <p class="text-sm text-slate-400">No shelves yet</p>
+                  <p class="text-sm text-slate-400">{t("common.noShelvesYetDialog")}</p>
                 </div>
               }
             >
@@ -196,11 +197,11 @@ const AddToShelfDialog: Component<AddToShelfDialogProps> = (props) => {
                         </p>
                         <p class="text-xs text-slate-500">
                           {shelf.bookCount ?? 0}{" "}
-                          {(shelf.bookCount ?? 0) === 1 ? "book" : "books"}
+                          {(shelf.bookCount ?? 0) === 1 ? t("common.book") : t("common.books")}
                         </p>
                       </div>
                       <Show when={inShelf()}>
-                        <span class="text-xs text-indigo-400">Added</span>
+                        <span class="text-xs text-indigo-400">{t("common.added")}</span>
                       </Show>
                     </button>
                   );
@@ -220,13 +221,13 @@ const AddToShelfDialog: Component<AddToShelfDialogProps> = (props) => {
                 class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-200"
               >
                 <Plus class="h-4 w-4" />
-                New Shelf
+                {t("common.newShelfDialog")}
               </button>
             }
           >
             <form onSubmit={handleCreateShelf} class="flex flex-col gap-3">
               <Input
-                placeholder="Shelf name"
+                placeholder={t("common.name")}
                 value={newName()}
                 onInput={(e) => setNewName(e.currentTarget.value)}
                 autofocus
@@ -245,7 +246,7 @@ const AddToShelfDialog: Component<AddToShelfDialogProps> = (props) => {
                     setCreateError("");
                   }}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   variant="primary"
@@ -254,7 +255,7 @@ const AddToShelfDialog: Component<AddToShelfDialogProps> = (props) => {
                   loading={creating()}
                   disabled={!newName().trim()}
                 >
-                  Create & Add
+                  {t("common.createAndAdd")}
                 </Button>
               </div>
             </form>

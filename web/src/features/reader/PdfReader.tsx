@@ -20,11 +20,12 @@ import {
   FileText,
 } from "lucide-solid";
 import { api, getAccessToken } from "../../shared/api/client";
+import { t } from "../../shared/i18n/i18n";
 
 // ---- Types ----
 
 interface PdfReaderSettings {
-  zoom?: number; // scale factor, e.g. 1.0 = 100%
+  zoom?: number;
   spreadMode?: "single" | "odd" | "even";
   scrollMode?: "vertical" | "horizontal" | "wrapped";
 }
@@ -133,11 +134,9 @@ const PdfReader: Component = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  // DOM refs.
   let canvasRef!: HTMLCanvasElement;
   let containerRef!: HTMLDivElement;
 
-  // UI state.
   const [showUI, setShowUI] = createSignal(true);
   const [showSettings, setShowSettings] = createSignal(false);
   const [showSidebar, setShowSidebar] = createSignal(false);
@@ -146,7 +145,6 @@ const PdfReader: Component = () => {
   const [error, setError] = createSignal<string | null>(null);
   const [rendering, setRendering] = createSignal(false);
 
-  // PDF state.
   const [currentPage, setCurrentPage] = createSignal(1);
   const [totalPages, setTotalPages] = createSignal(0);
   const [zoom, setZoom] = createSignal(1.0);
@@ -156,16 +154,13 @@ const PdfReader: Component = () => {
     { page: number; dataUrl: string }[]
   >([]);
 
-  // Settings.
   const [settings, setSettings] = createSignal<PdfReaderSettings>(defaultSettings);
 
-  // PDF.js instances — stored in a plain object to avoid reactivity wrapping.
   const pdfState: { pdf: any; renderTask: any } = {
     pdf: null,
     renderTask: null,
   };
 
-  // Auto-hide UI after 3 seconds of inactivity.
   let hideTimer: ReturnType<typeof setTimeout> | undefined;
 
   function resetHideTimer() {
@@ -178,7 +173,6 @@ const PdfReader: Component = () => {
     }, 3000);
   }
 
-  // Debounced progress save.
   const debouncedSaveProgress = debounce(
     (fileId: number, page: number) => {
       saveProgress(params.id, fileId, page);
@@ -186,39 +180,25 @@ const PdfReader: Component = () => {
     2000,
   );
 
-  // Render the current page to the canvas.
   async function renderPage(pageNum: number, scale: number) {
     if (!pdfState.pdf || !canvasRef) return;
-
-    // Cancel any in-progress render.
     if (pdfState.renderTask) {
       pdfState.renderTask.cancel();
       pdfState.renderTask = null;
     }
-
     setRendering(true);
-
     try {
       const page = await pdfState.pdf.getPage(pageNum);
       const viewport = page.getViewport({ scale });
-
-      // Size the canvas to the viewport.
       canvasRef.width = viewport.width;
       canvasRef.height = viewport.height;
-
       const ctx = canvasRef.getContext("2d");
       if (!ctx) return;
-
-      const renderContext = {
-        canvasContext: ctx,
-        viewport,
-      };
-
+      const renderContext = { canvasContext: ctx, viewport };
       pdfState.renderTask = page.render(renderContext);
       await pdfState.renderTask.promise;
       pdfState.renderTask = null;
     } catch (err: any) {
-      // RenderingCancelledException is expected when we cancel — ignore it.
       if (err?.name !== "RenderingCancelledException") {
         console.error("PDF render error:", err);
       }
@@ -227,7 +207,6 @@ const PdfReader: Component = () => {
     }
   }
 
-  // Generate a thumbnail for a given page number.
   async function generateThumbnail(
     pageNum: number,
   ): Promise<{ page: number; dataUrl: string } | null> {
@@ -248,23 +227,19 @@ const PdfReader: Component = () => {
     }
   }
 
-  // Load thumbnails lazily when the sidebar is opened.
   async function loadThumbnails() {
     if (!pdfState.pdf || thumbnails().length > 0) return;
     const total = pdfState.pdf.numPages as number;
     const results: { page: number; dataUrl: string }[] = [];
-    // Load in batches of 5 to avoid blocking.
     for (let i = 1; i <= total; i++) {
       const thumb = await generateThumbnail(i);
       if (thumb) results.push(thumb);
-      // Update signal incrementally so thumbnails appear as they load.
       if (i % 5 === 0 || i === total) {
         setThumbnails([...results]);
       }
     }
   }
 
-  // Navigate to a page from the PDF outline.
   async function navigateToOutlineItem(dest: any) {
     if (!pdfState.pdf) return;
     try {
@@ -353,19 +328,18 @@ const PdfReader: Component = () => {
   onMount(async () => {
     const fileId = searchParams.fileId;
     if (!fileId) {
-      setError("No file specified");
+      setError(t("reader.noFileSpecified"));
       setLoading(false);
       return;
     }
 
     const token = getAccessToken();
     if (!token) {
-      setError("Not authenticated");
+      setError(t("reader.notAuthenticated"));
       setLoading(false);
       return;
     }
 
-    // Load settings first.
     const savedSettings = await fetchSettings(params.id);
     const mergedSettings: PdfReaderSettings = {
       ...defaultSettings,
@@ -374,10 +348,7 @@ const PdfReader: Component = () => {
     setSettings(mergedSettings);
     setZoom(mergedSettings.zoom ?? 1.0);
 
-    // Dynamically import pdfjs-dist to avoid SSR issues.
     const pdfjsLib = await import("pdfjs-dist");
-
-    // Set up the worker using Vite's URL import.
     pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
       "pdfjs-dist/build/pdf.worker.min.mjs",
       import.meta.url,
@@ -396,7 +367,6 @@ const PdfReader: Component = () => {
       const total = pdfState.pdf.numPages as number;
       setTotalPages(total);
 
-      // Load outline (TOC).
       try {
         const outlineData = await pdfState.pdf.getOutline();
         if (outlineData) {
@@ -406,7 +376,6 @@ const PdfReader: Component = () => {
         // Outline is optional.
       }
 
-      // Restore saved progress.
       const savedProgress = await fetchProgress(params.id);
       let startPage = 1;
       if (savedProgress?.progress?.startsWith("page:")) {
@@ -420,9 +389,7 @@ const PdfReader: Component = () => {
 
       setLoading(false);
 
-      // Keyboard navigation.
       function handleKeyDown(e: KeyboardEvent) {
-        // Don't intercept when typing in the page input.
         if (
           e.target instanceof HTMLInputElement ||
           e.target instanceof HTMLTextAreaElement
@@ -450,7 +417,7 @@ const PdfReader: Component = () => {
       });
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to load PDF",
+        err instanceof Error ? err.message : t("reader.failedToLoadPDF"),
       );
       setLoading(false);
     }
@@ -466,23 +433,17 @@ const PdfReader: Component = () => {
     }
   });
 
-  // Re-render whenever page or zoom changes.
   createEffect(() => {
     const page = currentPage();
     const scale = zoom();
     const fileId = searchParams.fileId;
-
     if (!pdfState.pdf || loading()) return;
-
     renderPage(page, scale);
-
-    // Save progress (debounced).
     if (fileId) {
       debouncedSaveProgress(Number(fileId), page);
     }
   });
 
-  // Load thumbnails when sidebar opens on the thumbnails tab.
   createEffect(() => {
     if (showSidebar() && sidebarTab() === "thumbnails") {
       loadThumbnails();
@@ -497,17 +458,15 @@ const PdfReader: Component = () => {
       onMouseMove={resetHideTimer}
       onClick={resetHideTimer}
     >
-      {/* Loading overlay */}
       <Show when={loading()}>
         <div class="absolute inset-0 z-50 flex items-center justify-center bg-slate-950">
           <div class="flex flex-col items-center gap-3 text-slate-400">
             <FileText class="h-10 w-10 animate-pulse text-indigo-400" />
-            <p class="text-sm">Loading PDF…</p>
+            <p class="text-sm">{t("reader.loadingPDF")}</p>
           </div>
         </div>
       </Show>
 
-      {/* Error overlay */}
       <Show when={error()}>
         <div class="absolute inset-0 z-50 flex items-center justify-center bg-slate-950">
           <div class="flex flex-col items-center gap-4 text-center">
@@ -516,13 +475,12 @@ const PdfReader: Component = () => {
               onClick={() => navigate(-1)}
               class="text-sm text-slate-400 hover:text-slate-200 transition-colors"
             >
-              ← Go back
+              {t("common.goBack")}
             </button>
           </div>
         </div>
       </Show>
 
-      {/* Top bar */}
       <div
         class={`absolute left-0 right-0 top-0 z-30 flex items-center justify-between px-4 py-3 transition-all duration-300 ${
           showUI() ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-full"
@@ -534,23 +492,22 @@ const PdfReader: Component = () => {
           class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
         >
           <ArrowLeft class="h-4 w-4" />
-          <span class="hidden sm:inline">Back</span>
+          <span class="hidden sm:inline">{t("reader.back")}</span>
         </button>
 
         <div class="flex min-w-0 flex-1 flex-col items-center px-4">
           <Show when={totalPages() > 0}>
             <p class="text-sm font-medium text-slate-200">
-              Page {currentPage()} of {totalPages()}
+              {t("reader.pages")} {currentPage()} {t("common.of")} {totalPages()}
             </p>
           </Show>
         </div>
 
         <div class="flex items-center gap-1">
-          {/* Zoom controls */}
           <button
             onClick={zoomOut}
             class="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
-            title="Zoom out"
+            title={t("reader.zoomOut")}
           >
             <ZoomOut class="h-4 w-4" />
           </button>
@@ -560,38 +517,33 @@ const PdfReader: Component = () => {
           <button
             onClick={zoomIn}
             class="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
-            title="Zoom in"
+            title={t("reader.zoomIn")}
           >
             <ZoomIn class="h-4 w-4" />
           </button>
-
-          {/* Sidebar toggle */}
           <button
             onClick={() => {
               setShowSidebar((v) => !v);
               setShowSettings(false);
             }}
             class="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
-            title="Table of contents"
+            title={t("reader.tableOfContents")}
           >
             <List class="h-4 w-4" />
           </button>
-
-          {/* Settings toggle */}
           <button
             onClick={() => {
               setShowSettings((v) => !v);
               setShowSidebar(false);
             }}
             class="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
-            title="Reader settings"
+            title={t("reader.readerSettingsTitle")}
           >
             <Settings class="h-4 w-4" />
           </button>
         </div>
       </div>
 
-      {/* PDF canvas area */}
       <div
         ref={containerRef}
         class="flex flex-1 items-center justify-center overflow-auto"
@@ -608,7 +560,6 @@ const PdfReader: Component = () => {
         />
       </div>
 
-      {/* Bottom toolbar */}
       <div
         class={`absolute bottom-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 transition-all duration-300 ${
           showUI() ? "opacity-100 translate-y-0" : "opacity-0 translate-y-full"
@@ -621,10 +572,9 @@ const PdfReader: Component = () => {
           class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronLeft class="h-4 w-4" />
-          <span class="hidden sm:inline">Previous</span>
+          <span class="hidden sm:inline">{t("reader.previous")}</span>
         </button>
 
-        {/* Page number input */}
         <form onSubmit={handlePageInputCommit} class="flex items-center gap-2">
           <input
             type="number"
@@ -645,12 +595,11 @@ const PdfReader: Component = () => {
           disabled={currentPage() >= totalPages()}
           class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          <span class="hidden sm:inline">Next</span>
+          <span class="hidden sm:inline">{t("reader.next")}</span>
           <ChevronRight class="h-4 w-4" />
         </button>
       </div>
 
-      {/* Sidebar (TOC + Thumbnails) */}
       <div
         class={`absolute bottom-0 left-0 top-0 z-40 flex w-72 flex-col overflow-hidden transition-transform duration-300 ${
           showSidebar() ? "translate-x-0" : "-translate-x-full"
@@ -660,7 +609,6 @@ const PdfReader: Component = () => {
           "backdrop-filter": "blur(12px)",
         }}
       >
-        {/* Sidebar header */}
         <div class="flex items-center justify-between border-b border-white/10 px-4 py-3">
           <div class="flex gap-2">
             <button
@@ -671,7 +619,7 @@ const PdfReader: Component = () => {
                   : "text-slate-400 hover:bg-white/10 hover:text-slate-200"
               }`}
             >
-              Contents
+              {t("reader.contents")}
             </button>
             <button
               onClick={() => setSidebarTab("thumbnails")}
@@ -681,7 +629,7 @@ const PdfReader: Component = () => {
                   : "text-slate-400 hover:bg-white/10 hover:text-slate-200"
               }`}
             >
-              Pages
+              {t("reader.pages")}
             </button>
           </div>
           <button
@@ -692,14 +640,13 @@ const PdfReader: Component = () => {
           </button>
         </div>
 
-        {/* TOC tab */}
         <Show when={sidebarTab() === "toc"}>
           <nav class="flex-1 overflow-y-auto p-2">
             <Show
               when={outline().length > 0}
               fallback={
                 <p class="px-2 py-4 text-sm text-slate-500">
-                  No table of contents
+                  {t("reader.noTableOfContents")}
                 </p>
               }
             >
@@ -715,14 +662,13 @@ const PdfReader: Component = () => {
           </nav>
         </Show>
 
-        {/* Thumbnails tab */}
         <Show when={sidebarTab() === "thumbnails"}>
           <div class="flex-1 overflow-y-auto p-2">
             <Show
               when={thumbnails().length > 0}
               fallback={
                 <div class="flex items-center justify-center py-8">
-                  <p class="text-sm text-slate-500">Loading thumbnails…</p>
+                  <p class="text-sm text-slate-500">{t("reader.loadingThumbnails")}</p>
                 </div>
               }
             >
@@ -743,7 +689,7 @@ const PdfReader: Component = () => {
                     >
                       <img
                         src={thumb.dataUrl}
-                        alt={`Page ${thumb.page}`}
+                        alt={`${t("reader.pages")} ${thumb.page}`}
                         class="w-full rounded border border-white/10"
                       />
                       <span class="text-xs text-slate-400">{thumb.page}</span>
@@ -756,7 +702,6 @@ const PdfReader: Component = () => {
         </Show>
       </div>
 
-      {/* Settings panel */}
       <div
         class={`absolute bottom-0 right-0 top-0 z-40 w-72 overflow-y-auto transition-transform duration-300 ${
           showSettings() ? "translate-x-0" : "translate-x-full"
@@ -767,7 +712,7 @@ const PdfReader: Component = () => {
         }}
       >
         <div class="flex items-center justify-between border-b border-white/10 px-4 py-3">
-          <h2 class="text-sm font-semibold text-slate-200">Reader Settings</h2>
+          <h2 class="text-sm font-semibold text-slate-200">{t("reader.readerSettings")}</h2>
           <button
             onClick={() => setShowSettings(false)}
             class="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
@@ -777,10 +722,9 @@ const PdfReader: Component = () => {
         </div>
 
         <div class="flex flex-col gap-6 p-4">
-          {/* Zoom */}
           <div class="flex flex-col gap-2">
             <label class="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Zoom
+              {t("reader.zoom")}
             </label>
             <div class="flex flex-col gap-1">
               <For each={zoomPresets}>
@@ -803,18 +747,17 @@ const PdfReader: Component = () => {
             </div>
           </div>
 
-          {/* Spread mode */}
           <div class="flex flex-col gap-2">
             <label class="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Page Layout
+              {t("reader.pageLayout")}
             </label>
             <div class="flex flex-col gap-1">
               <For
                 each={
                   [
-                    { value: "single", label: "Single Page" },
-                    { value: "odd", label: "Two Pages (odd)" },
-                    { value: "even", label: "Two Pages (even)" },
+                    { value: "single", label: t("reader.singlePage") },
+                    { value: "odd", label: t("reader.twoPagesOdd") },
+                    { value: "even", label: t("reader.twoPagesEven") },
                   ] as const
                 }
               >
@@ -834,18 +777,17 @@ const PdfReader: Component = () => {
             </div>
           </div>
 
-          {/* Scroll mode */}
           <div class="flex flex-col gap-2">
             <label class="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Scroll Mode
+              {t("reader.scrollMode")}
             </label>
             <div class="flex flex-col gap-1">
               <For
                 each={
                   [
-                    { value: "vertical", label: "Vertical" },
-                    { value: "horizontal", label: "Horizontal" },
-                    { value: "wrapped", label: "Wrapped" },
+                    { value: "vertical", label: t("reader.vertical") },
+                    { value: "horizontal", label: t("reader.horizontal") },
+                    { value: "wrapped", label: t("reader.wrapped") },
                   ] as const
                 }
               >
@@ -867,7 +809,6 @@ const PdfReader: Component = () => {
         </div>
       </div>
 
-      {/* Overlay to close panels when clicking outside */}
       <Show when={showSidebar() || showSettings()}>
         <div
           class="absolute inset-0 z-[35]"
@@ -880,8 +821,6 @@ const PdfReader: Component = () => {
     </div>
   );
 };
-
-// ---- OutlineItemButton sub-component ----
 
 const OutlineItemButton: Component<{
   item: OutlineItem;

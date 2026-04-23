@@ -1,9 +1,9 @@
-import { type Component, type JSX, Show } from "solid-js";
+import { type Component, createResource, Show } from "solid-js";
 import { Navigate } from "@solidjs/router";
 import { Loader2 } from "lucide-solid";
 import { useAuth } from "./AuthProvider";
 
-const ProtectedRoute: Component<{ children: JSX.Element }> = (props) => {
+const ProtectedRoute: Component<{ children: any }> = (props) => {
   const auth = useAuth();
 
   return (

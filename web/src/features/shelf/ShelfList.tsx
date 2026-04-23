@@ -13,6 +13,7 @@ import { api } from "../../shared/api/client";
 import Button from "../../shared/ui/Button";
 import Input from "../../shared/ui/Input";
 import Skeleton from "../../shared/ui/Skeleton";
+import { t } from "../../shared/i18n/i18n";
 import type { Shelf, MagicShelf } from "../library/types";
 
 // ---- API ----
@@ -64,7 +65,7 @@ const ShelfCard: Component<{ shelf: Shelf; onClick: () => void }> = (props) => (
         </p>
         <p class="text-sm text-slate-400">
           {props.shelf.bookCount ?? 0}{" "}
-          {(props.shelf.bookCount ?? 0) === 1 ? "book" : "books"}
+          {(props.shelf.bookCount ?? 0) === 1 ? t("common.book") : t("common.books")}
         </p>
       </div>
     </div>
@@ -90,7 +91,7 @@ const CreateShelfDialog: Component<{
   async function handleSubmit(e: Event) {
     e.preventDefault();
     if (!name().trim()) {
-      setError("Name is required");
+      setError(t("common.nameRequired"));
       return;
     }
     setCreating(true);
@@ -105,7 +106,7 @@ const CreateShelfDialog: Component<{
       });
       props.onCreated(shelf);
     } catch {
-      setError("Failed to create shelf. Please try again.");
+      setError(t("common.failedToCreateShelf"));
     } finally {
       setCreating(false);
     }
@@ -120,7 +121,7 @@ const CreateShelfDialog: Component<{
     >
       <div class="w-full max-w-md rounded-xl bg-slate-800 shadow-2xl">
         <div class="flex items-center justify-between border-b border-slate-700 px-6 py-4">
-          <h2 class="text-lg font-semibold text-slate-100">New Shelf</h2>
+          <h2 class="text-lg font-semibold text-slate-100">{t("common.newShelf")}</h2>
           <button
             onClick={props.onClose}
             class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
@@ -131,27 +132,27 @@ const CreateShelfDialog: Component<{
 
         <form onSubmit={handleSubmit} class="flex flex-col gap-4 p-6">
           <Input
-            label="Name"
-            placeholder="My Reading List"
+            label={t("common.name")}
+            placeholder={t("common.placeholderShelfName")}
             value={name()}
             onInput={(e) => setName(e.currentTarget.value)}
             required
           />
           <Input
-            label="Description (optional)"
-            placeholder="Books I want to read this year"
+            label={t("common.descriptionOptional")}
+            placeholder={t("common.placeholderShelfDescription")}
             value={description()}
             onInput={(e) => setDescription(e.currentTarget.value)}
           />
           <div class="grid grid-cols-2 gap-4">
             <Input
-              label="Icon (emoji, optional)"
+              label={t("common.iconOptional")}
               placeholder="📚"
               value={icon()}
               onInput={(e) => setIcon(e.currentTarget.value)}
             />
             <Input
-              label="Color (hex, optional)"
+              label={t("common.colorOptional")}
               placeholder="#6366f1"
               value={iconColor()}
               onInput={(e) => setIconColor(e.currentTarget.value)}
@@ -164,10 +165,10 @@ const CreateShelfDialog: Component<{
 
           <div class="flex justify-end gap-3 pt-2">
             <Button variant="ghost" type="button" onClick={props.onClose}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button variant="primary" type="submit" loading={creating()}>
-              Create Shelf
+              {t("common.createShelf")}
             </Button>
           </div>
         </form>
@@ -222,10 +223,10 @@ const MagicShelfCard: Component<{ shelf: MagicShelf; onClick: () => void }> = (p
             {props.shelf.name}
           </p>
           <span class="shrink-0 rounded-full bg-indigo-600/20 px-1.5 py-0.5 text-[10px] font-medium text-indigo-400">
-            Magic
+            {t("common.magic")}
           </span>
         </div>
-        <p class="text-sm text-slate-400">Dynamic collection</p>
+        <p class="text-sm text-slate-400">{t("common.dynamicCollection")}</p>
       </div>
     </div>
     <Show when={props.shelf.description}>
@@ -252,11 +253,11 @@ const ShelfListInner: Component = () => {
       {/* Header */}
       <div class="flex items-center justify-between border-b border-slate-800 px-6 py-5">
         <div>
-          <h1 class="text-xl font-bold text-slate-100">Shelves</h1>
+          <h1 class="text-xl font-bold text-slate-100">{t("shelf.shelvesTitle")}</h1>
           <Show when={shelves()}>
             {(data) => (
               <p class="mt-1 text-sm text-slate-400">
-                {data().length} {data().length === 1 ? "shelf" : "shelves"}
+                {data().length} {data().length === 1 ? t("common.shelf") : t("common.shelves")}
               </p>
             )}
           </Show>
@@ -268,11 +269,11 @@ const ShelfListInner: Component = () => {
             onClick={() => navigate("/magic-shelves/new")}
           >
             <Wand2 class="h-4 w-4" />
-            New Magic Shelf
+            {t("common.newMagicShelf")}
           </Button>
           <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
             <Plus class="h-4 w-4" />
-            New Shelf
+            {t("common.newShelf")}
           </Button>
         </div>
       </div>
@@ -290,14 +291,14 @@ const ShelfListInner: Component = () => {
               <div class="flex flex-col items-center justify-center gap-4 py-12 text-center">
                 <BookMarked class="h-12 w-12 text-slate-600" />
                 <div>
-                  <p class="text-lg font-medium text-slate-300">No shelves yet</p>
+                  <p class="text-lg font-medium text-slate-300">{t("shelf.noShelvesYet")}</p>
                   <p class="mt-1 text-sm text-slate-500">
-                    Create one to organize your books.
+                    {t("shelf.createOneToOrganize")}
                   </p>
                 </div>
                 <Button variant="primary" onClick={() => setShowCreate(true)}>
                   <Plus class="h-4 w-4" />
-                  Create a Shelf
+                  {t("shelf.createAShelf")}
                 </Button>
               </div>
             }
@@ -321,7 +322,7 @@ const ShelfListInner: Component = () => {
             <div class="mb-4 flex items-center gap-2">
               <Wand2 class="h-4 w-4 text-indigo-400" />
               <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">
-                Magic Shelves
+                {t("common.magicShelves")}
               </h2>
             </div>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -355,7 +356,7 @@ const ShelfList: Component = () => (
   <ErrorBoundary
     fallback={(err) => (
       <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-        <p class="text-lg font-medium text-red-400">Failed to load shelves</p>
+        <p class="text-lg font-medium text-red-400">{t("shelf.failedToLoadShelves")}</p>
         <p class="text-sm text-slate-500">{err.message}</p>
       </div>
     )}

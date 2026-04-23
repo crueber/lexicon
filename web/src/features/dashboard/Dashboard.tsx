@@ -9,6 +9,7 @@ import {
 import { BookOpen, Library, BookMarked, Clock } from "lucide-solid";
 import { api } from "../../shared/api/client";
 import ScrollerRow from "./ScrollerRow";
+import { t } from "../../shared/i18n/i18n";
 import type { DashboardResponse } from "./types";
 
 // Fetch dashboard data from the API.
@@ -77,22 +78,22 @@ const DashboardContent: Component<{ data: DashboardResponse }> = (props) => {
         <StatCard
           icon={BookOpen}
           value={props.data.stats.totalBooks}
-          label="Total Books"
+          label={t("dashboard.totalBooks")}
         />
         <StatCard
           icon={Library}
           value={props.data.stats.totalLibraries}
-          label="Libraries"
+          label={t("dashboard.libraries")}
         />
         <StatCard
           icon={BookMarked}
           value={props.data.stats.booksReadThisMonth}
-          label="Read This Month"
+          label={t("dashboard.readThisMonth")}
         />
         <StatCard
           icon={Clock}
           value={formatReadingTime(props.data.stats.totalReadingTime)}
-          label="Reading Time"
+          label={t("dashboard.readingTime")}
         />
       </div>
 
@@ -129,9 +130,9 @@ const DashboardLoader: Component = () => {
             </For>
           </div>
           {/* Row skeletons */}
-          <ScrollerRowSkeleton title="Continue Reading" />
-          <ScrollerRowSkeleton title="Recently Added" />
-          <ScrollerRowSkeleton title="Random Picks" />
+          <ScrollerRowSkeleton title={t("dashboard.continueReading")} />
+          <ScrollerRowSkeleton title={t("dashboard.recentlyAdded")} />
+          <ScrollerRowSkeleton title={t("dashboard.randomPicks")} />
         </div>
       }
     >
@@ -151,7 +152,7 @@ const Dashboard: Component = () => {
             <BookOpen class="h-12 w-12 text-red-400/50" />
             <div class="text-center">
               <p class="text-base font-medium text-slate-200">
-                Failed to load dashboard
+                {t("dashboard.failedToLoadDashboard")}
               </p>
               <p class="mt-1 text-sm text-slate-400">{err.message}</p>
             </div>
@@ -168,9 +169,9 @@ const Dashboard: Component = () => {
                   )}
                 </For>
               </div>
-              <ScrollerRowSkeleton title="Continue Reading" />
-              <ScrollerRowSkeleton title="Recently Added" />
-              <ScrollerRowSkeleton title="Random Picks" />
+              <ScrollerRowSkeleton title={t("dashboard.continueReading")} />
+              <ScrollerRowSkeleton title={t("dashboard.recentlyAdded")} />
+              <ScrollerRowSkeleton title={t("dashboard.randomPicks")} />
             </div>
           }
         >

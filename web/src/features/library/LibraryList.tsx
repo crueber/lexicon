@@ -10,6 +10,7 @@ import { useNavigate } from "@solidjs/router";
 import { Library as LibraryIcon } from "lucide-solid";
 import { api } from "../../shared/api/client";
 import Skeleton from "../../shared/ui/Skeleton";
+import { t } from "../../shared/i18n/i18n";
 import type { Library } from "./types";
 
 async function fetchLibraries(): Promise<Library[]> {
@@ -56,8 +57,8 @@ const LibraryCard: Component<{ library: Library; onClick: () => void }> = (
         <h3 class="font-semibold text-slate-100">{props.library.name}</h3>
         <p class="mt-0.5 text-sm text-slate-400">
           {props.library.paths.length === 1
-            ? "1 path"
-            : `${props.library.paths.length} paths`}
+            ? `1 ${t("common.path")}`
+            : `${props.library.paths.length} ${t("common.paths")}`}
         </p>
       </div>
     </button>
@@ -86,9 +87,9 @@ const LibraryListInner: Component = () => {
           <div class="flex flex-col items-center justify-center gap-4 py-20 text-center">
             <LibraryIcon class="h-16 w-16 text-slate-600" />
             <div>
-              <p class="text-lg font-medium text-slate-300">No libraries yet</p>
+              <p class="text-lg font-medium text-slate-300">{t("library.noLibrariesYet")}</p>
               <p class="mt-1 text-sm text-slate-500">
-                Ask an admin to create a library to get started.
+                {t("library.askAdminToCreate")}
               </p>
             </div>
           </div>
@@ -114,9 +115,9 @@ const LibraryList: Component = () => {
     <div class="flex flex-1 flex-col">
       {/* Page header */}
       <div class="border-b border-slate-800 px-6 py-5">
-        <h1 class="text-xl font-bold text-slate-100">Libraries</h1>
+        <h1 class="text-xl font-bold text-slate-100">{t("library.librariesTitle")}</h1>
         <p class="mt-1 text-sm text-slate-400">
-          Browse your digital library collections
+          {t("library.librariesSubtitle")}
         </p>
       </div>
 
@@ -126,7 +127,7 @@ const LibraryList: Component = () => {
           fallback={(err) => (
             <div class="flex flex-col items-center justify-center gap-3 py-20 text-center">
               <p class="text-lg font-medium text-red-400">
-                Failed to load libraries
+                {t("library.failedToLoadLibraries")}
               </p>
               <p class="text-sm text-slate-500">{err.message}</p>
             </div>

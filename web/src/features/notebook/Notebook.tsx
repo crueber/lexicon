@@ -11,6 +11,7 @@ import {
 import { useNavigate } from "@solidjs/router";
 import { BookOpen, Trash2, Search, Filter } from "lucide-solid";
 import { api } from "../../shared/api/client";
+import { t } from "../../shared/i18n/i18n";
 
 // ---- Types ----
 
@@ -158,8 +159,8 @@ const Notebook: Component = () => {
     <div class="flex flex-1 flex-col overflow-hidden">
       {/* Header */}
       <div class="border-b border-slate-800 px-6 py-5">
-        <h1 class="text-xl font-bold text-slate-100">Notebook</h1>
-        <p class="mt-1 text-sm text-slate-400">Your highlights and notes across all books</p>
+        <h1 class="text-xl font-bold text-slate-100">{t("notebook.notebookTitle")}</h1>
+        <p class="mt-1 text-sm text-slate-400">{t("notebook.notebookSubtitle")}</p>
       </div>
 
       {/* Filters */}
@@ -169,7 +170,7 @@ const Notebook: Component = () => {
           <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <input
             type="text"
-            placeholder="Search annotations…"
+            placeholder={t("notebook.searchAnnotations")}
             value={search()}
             onInput={(e) => setSearch(e.currentTarget.value)}
             class="w-full rounded-lg border border-slate-700 bg-slate-800 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
@@ -202,7 +203,7 @@ const Notebook: Component = () => {
             }}
             class="rounded-lg border border-slate-700 bg-slate-800 py-2 px-3 text-sm text-slate-200 focus:border-indigo-500 focus:outline-none"
           >
-            <option value="">All books</option>
+            <option value="">{t("notebook.allBooks")}</option>
             <For each={books()}>
               {(book) => <option value={book.id}>{book.title}</option>}
             </For>
@@ -215,7 +216,7 @@ const Notebook: Component = () => {
         <ErrorBoundary
           fallback={(err) => (
             <div class="flex items-center justify-center py-16">
-              <p class="text-red-400">Failed to load annotations: {err.message}</p>
+              <p class="text-red-400">{t("notebook.failedToLoadAnnotations")}: {err.message}</p>
             </div>
           )}
         >
@@ -231,9 +232,9 @@ const Notebook: Component = () => {
               fallback={
                 <div class="flex flex-col items-center justify-center py-16 text-center">
                   <BookOpen class="mb-4 h-12 w-12 text-slate-600" />
-                  <p class="text-slate-400">No annotations yet</p>
+                  <p class="text-slate-400">{t("notebook.noAnnotationsYet")}</p>
                   <p class="mt-1 text-sm text-slate-500">
-                    Highlight text while reading an EPUB to create annotations
+                    {t("notebook.highlightTextWhileReading")}
                   </p>
                 </div>
               }
@@ -265,7 +266,7 @@ const Notebook: Component = () => {
                           <p class="font-semibold text-slate-200">{group.title}</p>
                           <p class="text-xs text-slate-500">
                             {group.annotations.length}{" "}
-                            {group.annotations.length === 1 ? "annotation" : "annotations"}
+                            {group.annotations.length === 1 ? t("common.annotation") : t("common.annotations")}
                           </p>
                         </div>
                       </button>
@@ -296,7 +297,7 @@ const Notebook: Component = () => {
                                 <button
                                   onClick={() => handleDelete(annotation)}
                                   class="shrink-0 rounded p-1 text-slate-500 hover:bg-white/10 hover:text-red-400 transition-colors"
-                                  title="Delete annotation"
+                                  title={t("notebook.deleteAnnotation")}
                                 >
                                   <Trash2 class="h-3.5 w-3.5" />
                                 </button>
@@ -319,15 +320,15 @@ const Notebook: Component = () => {
                   disabled={page() === 1}
                   class="rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  Previous
+                  {t("notebook.previous")}
                 </button>
-                <span class="text-sm text-slate-500">Page {page()}</span>
+                <span class="text-sm text-slate-500">{t("notebook.page")} {page()}</span>
                 <button
                   onClick={() => setPage((p) => p + 1)}
                   disabled={(data()?.offset ?? 0) + (data()?.limit ?? 50) >= (data()?.total ?? 0)}
                   class="rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  Next
+                  {t("notebook.next")}
                 </button>
               </div>
             </Show>

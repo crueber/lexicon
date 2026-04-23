@@ -14,6 +14,7 @@ import { api } from "../../shared/api/client";
 import { useAuth } from "../auth/AuthProvider";
 import Button from "../../shared/ui/Button";
 import Skeleton from "../../shared/ui/Skeleton";
+import { t } from "../../shared/i18n/i18n";
 import type { MagicShelf, MagicShelfBook, RuleGroup, RuleItem } from "../library/types";
 
 // ---- API ----
@@ -34,31 +35,31 @@ async function deleteMagicShelf(id: number): Promise<void> {
 
 function fieldLabel(field: string): string {
   const labels: Record<string, string> = {
-    title: "Title",
-    author: "Author",
-    category: "Category",
-    tag: "Tag",
-    series: "Series",
-    language: "Language",
-    book_type: "Book Type",
-    format: "Format",
-    publisher: "Publisher",
-    added_date: "Added Date",
-    page_count: "Page Count",
+    title: t("common.title"),
+    author: t("common.author"),
+    category: t("common.category"),
+    tag: t("common.tag"),
+    series: t("common.series"),
+    language: t("common.language"),
+    book_type: t("common.bookType"),
+    format: t("common.format"),
+    publisher: t("common.publisher"),
+    added_date: t("common.addedDate"),
+    page_count: t("common.pageCount"),
   };
   return labels[field] ?? field;
 }
 
 function operatorLabel(op: string): string {
   const labels: Record<string, string> = {
-    contains: "contains",
-    equals: "equals",
-    starts_with: "starts with",
-    ends_with: "ends with",
-    greater_than: "greater than",
-    less_than: "less than",
-    is_empty: "is empty",
-    is_not_empty: "is not empty",
+    contains: t("common.contains"),
+    equals: t("common.equals"),
+    starts_with: t("common.startsWith"),
+    ends_with: t("common.endsWith"),
+    greater_than: t("common.greaterThan"),
+    less_than: t("common.lessThan"),
+    is_empty: t("common.isEmpty"),
+    is_not_empty: t("common.isNotEmpty"),
   };
   return labels[op] ?? op;
 }
@@ -74,7 +75,7 @@ function ruleItemSummary(item: RuleItem): string {
 }
 
 function ruleGroupSummary(group: RuleGroup): string {
-  if (group.rules.length === 0) return "No rules";
+  if (group.rules.length === 0) return t("common.noRules");
   const parts = group.rules.map(ruleItemSummary);
   return parts.join(` ${group.operator} `);
 }
@@ -108,7 +109,7 @@ const MagicBookCard: Component<{
         >
           <img
             src={`/api/books/${props.book.id}/cover/thumbnail`}
-            alt={props.book.title ?? "Book cover"}
+            alt={props.book.title ?? t("common.bookCover")}
             loading="lazy"
             class="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
             onError={() => setImgError(true)}
@@ -117,7 +118,7 @@ const MagicBookCard: Component<{
       </div>
       <div class="min-w-0 flex-1">
         <p class="line-clamp-2 text-xs font-medium leading-tight text-slate-100">
-          {props.book.title ?? "Untitled"}
+          {props.book.title ?? t("common.untitled")}
         </p>
       </div>
     </button>
@@ -175,7 +176,7 @@ const MagicShelfDetailInner: Component<{ shelfId: number }> = (props) => {
       const group = JSON.parse(s.rules) as RuleGroup;
       return ruleGroupSummary(group);
     } catch {
-      return "Invalid rules";
+      return t("common.noRules");
     }
   });
 
@@ -204,7 +205,7 @@ const MagicShelfDetailInner: Component<{ shelfId: number }> = (props) => {
                 onClick={() => navigate("/shelves")}
                 class="text-sm text-slate-400 hover:text-slate-200 transition-colors"
               >
-                ← Shelves
+                ← {t("common.shelves")}
               </button>
               <div class="flex items-center gap-3">
                 <Show
@@ -217,7 +218,7 @@ const MagicShelfDetailInner: Component<{ shelfId: number }> = (props) => {
                   <div class="flex items-center gap-2">
                     <h1 class="text-xl font-bold text-slate-100">{s().name}</h1>
                     <span class="rounded-full bg-indigo-600/20 px-2 py-0.5 text-xs font-medium text-indigo-400">
-                      Magic
+                      {t("common.magic")}
                     </span>
                   </div>
                   <Show when={s().description}>
@@ -239,27 +240,27 @@ const MagicShelfDetailInner: Component<{ shelfId: number }> = (props) => {
                   onClick={() => navigate(`/magic-shelves/${props.shelfId}/edit`)}
                 >
                   <Pencil class="h-4 w-4" />
-                  Edit Rules
+                  {t("common.editRules")}
                 </Button>
                 <Show
                   when={!showDeleteConfirm()}
                   fallback={
                     <div class="flex items-center gap-2">
-                      <span class="text-sm text-slate-400">Are you sure?</span>
+                      <span class="text-sm text-slate-400">{t("common.areYouSure")}</span>
                       <Button
                         variant="danger"
                         size="sm"
                         onClick={handleDelete}
                         loading={deleting()}
                       >
-                        Delete
+                        {t("common.delete")}
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setShowDeleteConfirm(false)}
                       >
-                        Cancel
+                        {t("common.cancel")}
                       </Button>
                     </div>
                   }
@@ -270,7 +271,7 @@ const MagicShelfDetailInner: Component<{ shelfId: number }> = (props) => {
                     onClick={() => setShowDeleteConfirm(true)}
                   >
                     <Trash2 class="h-4 w-4" />
-                    Delete
+                    {t("common.delete")}
                   </Button>
                 </Show>
               </div>
@@ -301,10 +302,10 @@ const MagicShelfDetailInner: Component<{ shelfId: number }> = (props) => {
                     <Wand2 class="h-12 w-12 text-slate-600" />
                     <div>
                       <p class="text-lg font-medium text-slate-300">
-                        No books match these rules
+                        {t("shelf.noBooksMatchRules")}
                       </p>
                       <p class="mt-1 text-sm text-slate-500">
-                        Try adjusting the rules to find matching books.
+                        {t("shelf.tryAdjustingRules")}
                       </p>
                     </div>
                     <Button
@@ -314,14 +315,14 @@ const MagicShelfDetailInner: Component<{ shelfId: number }> = (props) => {
                       }
                     >
                       <Pencil class="h-4 w-4" />
-                      Edit Rules
+                      {t("common.editRules")}
                     </Button>
                   </div>
                 }
               >
                 <div class="mb-4 text-sm text-slate-400">
                   {(books() ?? []).length}{" "}
-                  {(books() ?? []).length === 1 ? "book" : "books"} matched
+                  {(books() ?? []).length === 1 ? t("common.book") : t("common.books")} {t("common.matched")}
                 </div>
                 <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                   <For each={books() ?? []}>
@@ -354,8 +355,8 @@ const MagicShelfDetail: Component = () => {
         <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
           <p class="text-lg font-medium text-red-400">
             {err.message.includes("404")
-              ? "Magic shelf not found"
-              : "Failed to load magic shelf"}
+              ? t("shelf.magicShelfNotFound")
+              : t("shelf.failedToLoadMagicShelf")}
           </p>
           <p class="text-sm text-slate-500">{err.message}</p>
         </div>
