@@ -169,6 +169,9 @@ func New(cfg Config) (*Server, error) {
 	metadataSvc.RegisterProvider(metadata.NewHardcoverProvider(cfg.HardcoverAPIKey, logger))
 	metadataSvc.RegisterProvider(metadata.NewComicVineProvider(cfg.ComicVineAPIKey, logger))
 	metadataSvc.RegisterProvider(metadata.NewAudibleProvider(logger))
+	metadataSvc.RegisterProvider(metadata.NewDoubanProvider(logger))
+	metadataSvc.RegisterProvider(metadata.NewLubimyCzytacProvider(logger))
+	metadataSvc.RegisterProvider(metadata.NewRanobeDBProvider(logger))
 	metadataHdlr := metadata.NewHandler(metadataSvc, logger)
 	metadataHdlr.WithAuditService(auditSvc)
 
