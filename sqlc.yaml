@@ -101,3 +101,12 @@ sql:
         out: "internal/recommendation"
         emit_json_tags: true
         emit_empty_slices: true
+  - engine: "sqlite"
+    queries: "internal/audit/queries.sql"
+    schema: "migrations/"
+    gen:
+      go:
+        package: "audit"
+        out: "internal/audit"
+        emit_json_tags: true
+        emit_empty_slices: true

@@ -118,6 +118,13 @@ func (s *Server) setupRoutes() {
 			r.Use(auth.RequireAdmin())
 			s.metadataHandler.AdminRoutes(r)
 		})
+
+		// Admin audit log routes (require auth + admin).
+		r.Route("/admin/audit-logs", func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			r.Use(auth.RequireAdmin())
+			r.Get("/", s.auditHandler.HandleListAuditLogs)
+		})
 	})
 
 	// OPDS catalog routes (no JWT auth — OPDS uses its own Basic Auth).

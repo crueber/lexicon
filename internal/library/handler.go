@@ -7,9 +7,11 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/crueber/lexicon/internal/audit"
 	"github.com/crueber/lexicon/internal/auth"
 )
 
@@ -19,6 +21,7 @@ type Handler struct {
 	scanner     *Scanner
 	taskEnqueue func(taskType, payload string) (int64, error)
 	logger      *slog.Logger
+	auditSvc    *audit.Service
 }
 
 // NewHandler creates a new library Handler.
@@ -35,6 +38,11 @@ func NewHandler(svc *Service, scanner *Scanner, logger *slog.Logger) *Handler {
 // WithTaskEnqueue sets the function used to enqueue background tasks.
 func (h *Handler) WithTaskEnqueue(fn func(taskType, payload string) (int64, error)) {
 	h.taskEnqueue = fn
+}
+
+// WithAuditService sets the audit service for logging library events.
+func (h *Handler) WithAuditService(svc *audit.Service) {
+	h.auditSvc = svc
 }
 
 // Routes registers all library routes on the given router.
@@ -182,6 +190,18 @@ func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("library created", "library_id", lib.ID, "name", lib.Name)
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			Action:       audit.ActionLibraryCreated,
+			ResourceType: "library",
+			ResourceID:   &lib.ID,
+			IPAddress:    ip,
+		})
+	}
 	writeJSON(w, http.StatusCreated, toLibraryResponse(*lib, paths))
 }
 
@@ -262,6 +282,18 @@ func (h *Handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("library updated", "library_id", id)
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			Action:       audit.ActionLibraryUpdated,
+			ResourceType: "library",
+			ResourceID:   &id,
+			IPAddress:    ip,
+		})
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -283,6 +315,18 @@ func (h *Handler) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("library deleted", "library_id", id)
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			Action:       audit.ActionLibraryDeleted,
+			ResourceType: "library",
+			ResourceID:   &id,
+			IPAddress:    ip,
+		})
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -340,6 +384,23 @@ func (h *Handler) handleScan(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.logger.Info("library scan task enqueued", "library_id", id, "task_id", taskID)
+		if h.auditSvc != nil {
+			ip := r.RemoteAddr
+			if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+				ip = strings.Split(xff, ",")[0]
+			}
+			var userID int64
+			if p != nil {
+				userID = p.UserID
+			}
+			h.auditSvc.Log(r.Context(), audit.LogParams{
+				UserID:       &userID,
+				Action:       audit.ActionLibraryScanned,
+				ResourceType: "library",
+				ResourceID:   &id,
+				IPAddress:    ip,
+			})
+		}
 		writeJSON(w, http.StatusAccepted, ScanEnqueueResponse{TaskID: taskID})
 		return
 	}
@@ -372,6 +433,24 @@ func (h *Handler) handleScan(w http.ResponseWriter, r *http.Request) {
 		"files_added", result.FilesAdded,
 		"errors", len(result.Errors),
 	)
+
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		var userID int64
+		if p != nil {
+			userID = p.UserID
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			UserID:       &userID,
+			Action:       audit.ActionLibraryScanned,
+			ResourceType: "library",
+			ResourceID:   &id,
+			IPAddress:    ip,
+		})
+	}
 
 	writeJSON(w, http.StatusOK, ScanResponse{
 		BooksAdded:   result.BooksAdded,

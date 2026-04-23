@@ -11,6 +11,7 @@ import {
   Menu,
   X,
   Notebook as NotebookIcon,
+  ClipboardList,
 } from "lucide-solid";
 import AuthProvider, { useAuth } from "./features/auth/AuthProvider";
 import LoginPage from "./features/auth/LoginPage";
@@ -30,6 +31,7 @@ import ShelfDetail from "./features/shelf/ShelfDetail";
 import MagicShelfBuilder from "./features/shelf/MagicShelfBuilder";
 import MagicShelfDetail from "./features/shelf/MagicShelfDetail";
 import UserManagement from "./features/admin/UserManagement";
+import AuditLogs from "./features/admin/AuditLogs";
 import Notebook from "./features/notebook/Notebook";
 import ToastContainer from "./shared/ui/Toast";
 import WSProvider from "./shared/ws/WSProvider";
@@ -97,6 +99,7 @@ const Sidebar: Component = () => {
             </span>
           </div>
           <NavItem href="/admin/users" icon={Users} label="Users" />
+          <NavItem href="/admin/audit-logs" icon={ClipboardList} label="Audit Logs" />
           <NavItem href="/admin/settings" icon={Settings} label="Settings" />
         </Show>
       </nav>
@@ -168,6 +171,7 @@ const MobileNav: Component = () => {
                 Admin
               </p>
               <NavItem href="/admin/users" icon={Users} label="Users" onClick={() => setMenuOpen(false)} />
+              <NavItem href="/admin/audit-logs" icon={ClipboardList} label="Audit Logs" onClick={() => setMenuOpen(false)} />
               <NavItem href="/admin/settings" icon={Settings} label="Settings" onClick={() => setMenuOpen(false)} />
               <div class="my-2 border-t border-slate-800" />
             </Show>
@@ -272,6 +276,7 @@ const App: Component = () => {
         <Route path="/notebook" component={Notebook} />
         <Route path="/settings" component={SettingsPage} />
         <Route path="/admin/users" component={UserManagement} />
+        <Route path="/admin/audit-logs" component={AuditLogs} />
         <Route path="/admin/settings" component={AdminSettingsStub} />
       </Route>
     </Router>

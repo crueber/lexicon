@@ -6,16 +6,19 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/crueber/lexicon/internal/audit"
 	"github.com/crueber/lexicon/internal/user"
 )
 
 // Handler handles authentication HTTP endpoints.
 type Handler struct {
-	db     *sql.DB
-	secret string
-	logger *slog.Logger
+	db       *sql.DB
+	secret   string
+	logger   *slog.Logger
+	auditSvc *audit.Service
 }
 
 // NewHandler creates a new auth Handler.
@@ -25,6 +28,11 @@ func NewHandler(db *sql.DB, secret string, logger *slog.Logger) *Handler {
 		secret: secret,
 		logger: logger,
 	}
+}
+
+// WithAuditService sets the audit service for logging auth events.
+func (h *Handler) WithAuditService(svc *audit.Service) {
+	h.auditSvc = svc
 }
 
 // loginRequest is the JSON body for POST /api/auth/login.
@@ -189,6 +197,18 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("user logged in", "user_id", u.ID, "username", u.Username)
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			UserID:   &u.ID,
+			Username: u.Username,
+			Action:   audit.ActionUserLogin,
+			IPAddress: ip,
+		})
+	}
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -340,10 +360,37 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	q := user.New(h.db)
 
 	tokenHash := HashToken(req.RefreshToken)
+
+	// Look up the user before revoking so we can audit the logout.
+	var userID int64
+	var username string
+	if h.auditSvc != nil {
+		rt, err := q.GetRefreshToken(ctx, tokenHash)
+		if err == nil {
+			userID = rt.UserID
+			if u, err := q.GetUserByID(ctx, rt.UserID); err == nil {
+				username = u.Username
+			}
+		}
+	}
+
 	if err := q.RevokeRefreshToken(ctx, tokenHash); err != nil {
 		h.logger.Error("revoke refresh token on logout", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
+	}
+
+	if h.auditSvc != nil && userID != 0 {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			UserID:   &userID,
+			Username: username,
+			Action:   audit.ActionUserLogout,
+			IPAddress: ip,
+		})
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})

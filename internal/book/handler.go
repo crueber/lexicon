@@ -9,9 +9,11 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/crueber/lexicon/internal/audit"
 	"github.com/crueber/lexicon/internal/auth"
 )
 
@@ -26,6 +28,7 @@ type Handler struct {
 	db           *sql.DB
 	logger       *slog.Logger
 	shelfHandler shelfHandler
+	auditSvc     *audit.Service
 }
 
 // NewHandler creates a new book Handler.
@@ -39,6 +42,11 @@ func NewHandler(db *sql.DB, logger *slog.Logger) *Handler {
 // WithShelfHandler sets the shelf handler for the /api/books/{id}/shelves endpoint.
 func (h *Handler) WithShelfHandler(sh shelfHandler) {
 	h.shelfHandler = sh
+}
+
+// WithAuditService sets the audit service for logging book events.
+func (h *Handler) WithAuditService(svc *audit.Service) {
+	h.auditSvc = svc
 }
 
 // Routes registers all book routes on the given router.
@@ -590,6 +598,24 @@ func (h *Handler) handleDelete(w http.ResponseWriter, r *http.Request) {
 		h.logger.Error("delete book", "book_id", id, "error", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
+	}
+
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		var userID int64
+		if principal != nil {
+			userID = principal.UserID
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			UserID:     &userID,
+			Action:     audit.ActionBookDeleted,
+			ResourceType: "book",
+			ResourceID: &id,
+			IPAddress:  ip,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)

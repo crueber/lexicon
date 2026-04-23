@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.31.1
 
-package book
+package audit
 
 import (
 	"database/sql"

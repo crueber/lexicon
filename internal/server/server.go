@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/crueber/lexicon/internal/audit"
 	"github.com/crueber/lexicon/internal/auth"
 	"github.com/crueber/lexicon/internal/book"
 	"github.com/crueber/lexicon/internal/dashboard"
@@ -52,6 +53,7 @@ type Server struct {
 	koboHandler      *kobo.Handler
 	koreaderHandler      *koreader.Handler
 	recommendationHandler *recommendation.Handler
+	auditHandler         *audit.Handler
 	hub                  *ws.Hub
 	wsHandler            *ws.Handler
 	watcher              *library.Watcher
@@ -94,16 +96,25 @@ func New(cfg Config) (*Server, error) {
 	taskScheduler := task.NewScheduler(taskRunner, db, logger)
 	taskHandler := task.NewHandler(taskRunner, taskScheduler, db, logger)
 
+	// Set up the audit service.
+	auditSvc := audit.NewService(db, logger)
+	taskRunner.Register(task.TypeAuditLogCleanup, func(ctx context.Context, _ string, _ task.Reporter) error {
+		return auditSvc.Cleanup(ctx, 365)
+	})
+
 	libraryHandler := library.NewHandler(librarySvc, libraryScanner, logger)
 	libraryHandler.WithTaskEnqueue(func(taskType, payload string) (int64, error) {
 		return taskRunner.Enqueue(context.Background(), taskType, payload)
 	})
+	libraryHandler.WithAuditService(auditSvc)
 
 	shelfSvc := shelf.NewService(db, logger)
 	shelfHdlr := shelf.NewHandler(shelfSvc, logger)
+	shelfHdlr.WithAuditService(auditSvc)
 
 	bookHdlr := book.NewHandler(db, logger)
 	bookHdlr.WithShelfHandler(shelfHdlr)
+	bookHdlr.WithAuditService(auditSvc)
 
 	// Build the user handler with injected dependencies to avoid import cycles.
 	// The user package cannot import auth (auth imports user), so we inject
@@ -142,6 +153,7 @@ func New(cfg Config) (*Server, error) {
 			return tx.Commit()
 		},
 	)
+	userHdlr.WithAuditService(auditSvc)
 
 	// Set up the metadata service and register providers.
 	metadataSvc := metadata.NewService(db, logger)
@@ -151,6 +163,7 @@ func New(cfg Config) (*Server, error) {
 	metadataSvc.RegisterProvider(metadata.NewComicVineProvider(cfg.ComicVineAPIKey, logger))
 	metadataSvc.RegisterProvider(metadata.NewAudibleProvider(logger))
 	metadataHdlr := metadata.NewHandler(metadataSvc, logger)
+	metadataHdlr.WithAuditService(auditSvc)
 
 	// Set up the recommendation service.
 	recSvc := recommendation.NewService(db, logger)
@@ -171,17 +184,23 @@ func New(cfg Config) (*Server, error) {
 
 	koreaderHdlr := koreader.NewHandler(db, logger)
 
+	authHdlr := auth.NewHandler(db, cfg.JWTSecret, logger)
+	authHdlr.WithAuditService(auditSvc)
+
+	readerHdlr := reader.NewHandler(db, logger)
+	readerHdlr.WithAuditService(auditSvc)
+
 	s := &Server{
 		cfg:              cfg,
 		db:               db,
 		router:           chi.NewRouter(),
 		logger:           logger,
-		authHandler:      auth.NewHandler(db, cfg.JWTSecret, logger),
+		authHandler:      authHdlr,
 		userHandler:      userHdlr,
 		libraryHandler:   libraryHandler,
 		bookHandler:      bookHdlr,
 		storageHandler:   storage.NewHandler(db, cfg.DataDir, logger),
-		readerHandler:    reader.NewHandler(db, logger),
+		readerHandler:    readerHdlr,
 		notebookHandler:  notebook.NewHandler(db, logger),
 		shelfHandler:     shelfHdlr,
 		dashboardHandler: dashboard.NewHandler(db, logger),
@@ -190,7 +209,8 @@ func New(cfg Config) (*Server, error) {
 		koboHandler:           koboHdlr,
 		koreaderHandler:       koreaderHdlr,
 		recommendationHandler: recHdlr,
-		hub:                   hub,
+		auditHandler:         audit.NewHandler(db, auditSvc, logger),
+		hub:                  hub,
 		wsHandler:        wsHandler,
 		watcher:          watcher,
 		taskRunner:       taskRunner,

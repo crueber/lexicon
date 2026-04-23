@@ -28,6 +28,19 @@ type AppSetting struct {
 	Value sql.NullString `json:"value"`
 }
 
+type AuditLog struct {
+	ID           int64          `json:"id"`
+	UserID       sql.NullInt64  `json:"user_id"`
+	Username     sql.NullString `json:"username"`
+	Action       string         `json:"action"`
+	ResourceType sql.NullString `json:"resource_type"`
+	ResourceID   sql.NullInt64  `json:"resource_id"`
+	Details      sql.NullString `json:"details"`
+	IpAddress    sql.NullString `json:"ip_address"`
+	Country      sql.NullString `json:"country"`
+	CreatedAt    string         `json:"created_at"`
+}
+
 type Author struct {
 	ID         int64          `json:"id"`
 	Name       string         `json:"name"`

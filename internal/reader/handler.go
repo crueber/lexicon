@@ -13,13 +13,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/crueber/lexicon/internal/audit"
 	"github.com/crueber/lexicon/internal/auth"
 )
 
 // Handler handles HTTP requests for the reader endpoints.
 type Handler struct {
-	db     *sql.DB
-	logger *slog.Logger
+	db       *sql.DB
+	logger   *slog.Logger
+	auditSvc *audit.Service
 }
 
 // Compile-time interface check.
@@ -31,6 +33,11 @@ func NewHandler(db *sql.DB, logger *slog.Logger) *Handler {
 		db:     db,
 		logger: logger,
 	}
+}
+
+// WithAuditService sets the audit service for logging reader events.
+func (h *Handler) WithAuditService(svc *audit.Service) {
+	h.auditSvc = svc
 }
 
 // ServeHTTP implements http.Handler (required for compile-time check).
@@ -187,6 +194,24 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentTypeForFormat(bookFile.Format))
 	w.Header().Set("Content-Disposition", "inline")
 	w.Header().Set("Accept-Ranges", "bytes")
+
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		var userID int64
+		if principal != nil {
+			userID = principal.UserID
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			UserID:       &userID,
+			Action:       audit.ActionBookDownloaded,
+			ResourceType: "book",
+			ResourceID:   &bookID,
+			IPAddress:    ip,
+		})
+	}
 
 	// http.ServeContent handles Range requests, ETags, and Last-Modified automatically.
 	http.ServeContent(w, r, stat.Name(), stat.ModTime(), f)

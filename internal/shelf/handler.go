@@ -7,16 +7,19 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/crueber/lexicon/internal/audit"
 	"github.com/crueber/lexicon/internal/auth"
 )
 
 // Handler handles HTTP requests for shelf management.
 type Handler struct {
-	svc    *Service
-	logger *slog.Logger
+	svc      *Service
+	logger   *slog.Logger
+	auditSvc *audit.Service
 }
 
 // NewHandler creates a new shelf Handler.
@@ -25,6 +28,11 @@ func NewHandler(svc *Service, logger *slog.Logger) *Handler {
 		svc:    svc,
 		logger: logger,
 	}
+}
+
+// WithAuditService sets the audit service for logging shelf events.
+func (h *Handler) WithAuditService(svc *audit.Service) {
+	h.auditSvc = svc
 }
 
 // Routes registers all shelf routes on the given router.
@@ -153,6 +161,20 @@ func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			UserID:       &principal.UserID,
+			Username:     principal.Username,
+			Action:       audit.ActionShelfCreated,
+			ResourceType: "shelf",
+			ResourceID:   &sh.ID,
+			IPAddress:    ip,
+		})
+	}
 	writeJSON(w, http.StatusCreated, shelfToResponse(*sh))
 }
 
@@ -273,6 +295,20 @@ func (h *Handler) handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			UserID:       &principal.UserID,
+			Username:     principal.Username,
+			Action:       audit.ActionShelfDeleted,
+			ResourceType: "shelf",
+			ResourceID:   &id,
+			IPAddress:    ip,
+		})
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 

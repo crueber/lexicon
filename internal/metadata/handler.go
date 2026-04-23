@@ -7,16 +7,19 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/crueber/lexicon/internal/audit"
 	"github.com/crueber/lexicon/internal/auth"
 )
 
 // Handler handles HTTP requests for metadata operations.
 type Handler struct {
-	svc    *Service
-	logger *slog.Logger
+	svc      *Service
+	logger   *slog.Logger
+	auditSvc *audit.Service
 }
 
 // NewHandler creates a new metadata Handler.
@@ -25,6 +28,11 @@ func NewHandler(svc *Service, logger *slog.Logger) *Handler {
 		svc:    svc,
 		logger: logger,
 	}
+}
+
+// WithAuditService sets the audit service for logging metadata events.
+func (h *Handler) WithAuditService(svc *audit.Service) {
+	h.auditSvc = svc
 }
 
 // Routes registers all metadata routes on the given router.
@@ -163,6 +171,24 @@ func (h *Handler) handleAcceptProposal(w http.ResponseWriter, r *http.Request) {
 		h.logger.Error("accept proposal", "proposal_id", proposalID, "error", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
+	}
+
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		var userID int64
+		if principal != nil {
+			userID = principal.UserID
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			UserID:       &userID,
+			Action:       audit.ActionBookMetadataUpdated,
+			ResourceType: "proposal",
+			ResourceID:   &proposalID,
+			IPAddress:    ip,
+		})
 	}
 
 	w.WriteHeader(http.StatusNoContent)

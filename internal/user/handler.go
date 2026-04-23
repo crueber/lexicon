@@ -8,7 +8,9 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
+	"github.com/crueber/lexicon/internal/audit"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -40,6 +42,7 @@ type Handler struct {
 	logger           *slog.Logger
 	getPrincipal     PrincipalExtractor
 	setLibraryAccess LibraryAccessSetter
+	auditSvc         *audit.Service
 }
 
 // NewHandler creates a new user Handler.
@@ -52,6 +55,11 @@ func NewHandler(db *sql.DB, logger *slog.Logger, getPrincipal PrincipalExtractor
 		getPrincipal:     getPrincipal,
 		setLibraryAccess: setLibraryAccess,
 	}
+}
+
+// WithAuditService sets the audit service for logging user events.
+func (h *Handler) WithAuditService(svc *audit.Service) {
+	h.auditSvc = svc
 }
 
 // AdminRoutes registers admin user management routes on the given router.
@@ -239,6 +247,19 @@ func (h *Handler) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	resp.Permissions = toPermissionsResponse(perms)
 
 	h.logger.Info("admin created user", "username", u.Username, "role", req.Role)
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			UserID:     &u.ID,
+			Username:   u.Username,
+			Action:     audit.ActionUserCreated,
+			IPAddress:  ip,
+			Details:    map[string]any{"role": req.Role},
+		})
+	}
 	writeJSON(w, http.StatusCreated, resp)
 }
 
@@ -354,6 +375,17 @@ func (h *Handler) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			UserID:    &id,
+			Action:    audit.ActionUserUpdated,
+			IPAddress: ip,
+		})
+	}
 	writeJSON(w, http.StatusOK, toUserResponse(updated))
 }
 
@@ -382,6 +414,17 @@ func (h *Handler) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("admin deleted user", "user_id", id)
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			UserID:    &id,
+			Action:    audit.ActionUserDeleted,
+			IPAddress: ip,
+		})
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
@@ -436,6 +479,18 @@ func (h *Handler) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("admin reset user password", "user_id", id)
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			UserID:    &id,
+			Action:    audit.ActionUserUpdated,
+			IPAddress: ip,
+			Details:   map[string]any{"field": "password"},
+		})
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
@@ -502,6 +557,18 @@ func (h *Handler) handleSetPermissions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("admin set user permissions", "user_id", id, "role", req.Role)
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			UserID:    &id,
+			Action:    audit.ActionUserUpdated,
+			IPAddress: ip,
+			Details:   map[string]any{"field": "permissions", "role": req.Role},
+		})
+	}
 	writeJSON(w, http.StatusOK, toPermissionsResponse(perms))
 }
 
@@ -534,6 +601,18 @@ func (h *Handler) handleSetLibraries(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("admin set user library access", "user_id", id, "library_count", len(req.LibraryIDs))
+	if h.auditSvc != nil {
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ip = strings.Split(xff, ",")[0]
+		}
+		h.auditSvc.Log(r.Context(), audit.LogParams{
+			UserID:    &id,
+			Action:    audit.ActionUserUpdated,
+			IPAddress: ip,
+			Details:   map[string]any{"field": "libraries", "count": len(req.LibraryIDs)},
+		})
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"libraryIds": req.LibraryIDs})
 }
 
