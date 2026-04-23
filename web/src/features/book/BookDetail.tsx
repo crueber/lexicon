@@ -26,7 +26,7 @@ import Button from "../../shared/ui/Button";
 import Skeleton from "../../shared/ui/Skeleton";
 import AddToShelfDialog from "../shelf/AddToShelfDialog";
 import MetadataSearch from "./MetadataSearch";
-import type { BookDetail as BookDetailType, BookFile, Shelf } from "../library/types";
+import type { BookDetail as BookDetailType, BookFile, Shelf, SimilarBook } from "../library/types";
 
 // ---- API ----
 
@@ -36,6 +36,10 @@ async function fetchBookDetail(id: number): Promise<BookDetailType> {
 
 async function fetchBookShelves(id: number): Promise<Shelf[]> {
   return api<Shelf[]>(`/books/${id}/shelves`);
+}
+
+async function fetchSimilarBooks(id: number): Promise<SimilarBook[]> {
+  return api<SimilarBook[]>(`/books/${id}/similar`);
 }
 
 // ---- Helpers ----
@@ -132,6 +136,61 @@ const FileRow: Component<{ file: BookFile }> = (props) => (
     </div>
   </div>
 );
+
+const SimilarBooksSection: Component<{ bookId: number }> = (props) => {
+  const navigate = useNavigate();
+  const [similarBooks] = createResource(() => props.bookId, fetchSimilarBooks);
+
+  return (
+    <div class="flex flex-col gap-3">
+      <span class="text-xs font-medium uppercase tracking-wide text-slate-500">
+        Similar Books
+      </span>
+      <Suspense fallback={<div class="h-24 animate-pulse rounded-lg bg-slate-800" />}>
+        <Show
+          when={(similarBooks() ?? []).length > 0}
+          fallback={
+            <p class="text-sm text-slate-500">
+              No recommendations yet. Run a vector rebuild task.
+            </p>
+          }
+        >
+          <div class="flex gap-4 overflow-x-auto pb-2">
+            <For each={similarBooks() ?? []}>
+              {(similarBook) => (
+                <button
+                  onClick={() => navigate(`/books/${similarBook.id}`)}
+                  class="flex w-24 shrink-0 flex-col gap-1 text-left"
+                >
+                  <div class="aspect-[2/3] w-full overflow-hidden rounded-lg bg-slate-700">
+                    <Show
+                      when={similarBook.coverPath}
+                      fallback={
+                        <CoverPlaceholder bookType={similarBook.bookType} />
+                      }
+                    >
+                      <img
+                        src={`/api/books/${similarBook.id}/cover`}
+                        alt={similarBook.title ?? "Book cover"}
+                        class="h-full w-full object-cover"
+                      />
+                    </Show>
+                  </div>
+                  <p class="line-clamp-2 text-xs font-medium text-slate-200">
+                    {similarBook.title ?? "Untitled"}
+                  </p>
+                  <p class="text-xs text-slate-500">
+                    {Math.round(similarBook.similarity * 100)}% match
+                  </p>
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
+      </Suspense>
+    </div>
+  );
+};
 
 // ---- Skeleton ----
 
@@ -491,6 +550,9 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
                   </div>
                 </div>
               </Show>
+
+              {/* Similar Books */}
+              <SimilarBooksSection bookId={props.bookId} />
             </div>
           </div>
         </div>

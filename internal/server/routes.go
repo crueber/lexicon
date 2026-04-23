@@ -50,6 +50,9 @@ func (s *Server) setupRoutes() {
 			r.Route("/{id}/cover", func(r chi.Router) {
 				s.storageHandler.Routes(r)
 			})
+
+			// Similar books recommendation.
+			r.Get("/{id}/similar", s.recommendationHandler.HandleSimilarBooks)
 		})
 
 		// Shelf routes (require auth).

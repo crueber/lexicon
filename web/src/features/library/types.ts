@@ -148,3 +148,14 @@ export interface MagicShelfBook {
   coverPath?: string;
   addedDate?: string;
 }
+
+export interface SimilarBook {
+  id: number;
+  libraryId: number;
+  bookType: "EBOOK" | "AUDIOBOOK" | "COMIC";
+  title?: string;
+  authors: string[];
+  coverPath?: string;
+  addedDate?: string;
+  similarity: number;
+}

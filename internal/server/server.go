@@ -24,6 +24,7 @@ import (
 	"github.com/crueber/lexicon/internal/notebook"
 	"github.com/crueber/lexicon/internal/opds"
 	"github.com/crueber/lexicon/internal/reader"
+	"github.com/crueber/lexicon/internal/recommendation"
 	"github.com/crueber/lexicon/internal/shelf"
 	"github.com/crueber/lexicon/internal/storage"
 	"github.com/crueber/lexicon/internal/task"
@@ -49,13 +50,14 @@ type Server struct {
 	metadataHandler  *metadata.Handler
 	opdsHandler      *opds.Handler
 	koboHandler      *kobo.Handler
-	koreaderHandler  *koreader.Handler
-	hub              *ws.Hub
-	wsHandler        *ws.Handler
-	watcher          *library.Watcher
-	taskRunner       *task.Runner
-	taskScheduler    *task.Scheduler
-	taskHandler      *task.Handler
+	koreaderHandler      *koreader.Handler
+	recommendationHandler *recommendation.Handler
+	hub                  *ws.Hub
+	wsHandler            *ws.Handler
+	watcher              *library.Watcher
+	taskRunner           *task.Runner
+	taskScheduler        *task.Scheduler
+	taskHandler          *task.Handler
 }
 
 // New creates a new Server with the given configuration, opens the database,
@@ -150,6 +152,13 @@ func New(cfg Config) (*Server, error) {
 	metadataSvc.RegisterProvider(metadata.NewAudibleProvider(logger))
 	metadataHdlr := metadata.NewHandler(metadataSvc, logger)
 
+	// Set up the recommendation service.
+	recSvc := recommendation.NewService(db, logger)
+	recHdlr := recommendation.NewHandler(recSvc, logger)
+
+	// Register background tasks.
+	taskRunner.Register(task.TypeRecommendationRebuild, recommendation.NewRebuildFunc(recSvc))
+
 	koboHdlr := kobo.NewHandler(db, cfg.DataDir, logger)
 	// Inject a principal extractor to avoid an import cycle between kobo and auth.
 	koboHdlr.WithPrincipalExtractor(func(r *http.Request) (int64, bool) {
@@ -178,9 +187,10 @@ func New(cfg Config) (*Server, error) {
 		dashboardHandler: dashboard.NewHandler(db, logger),
 		metadataHandler:  metadataHdlr,
 		opdsHandler:      opds.NewHandler(db, logger),
-		koboHandler:      koboHdlr,
-		koreaderHandler:  koreaderHdlr,
-		hub:              hub,
+		koboHandler:           koboHdlr,
+		koreaderHandler:       koreaderHdlr,
+		recommendationHandler: recHdlr,
+		hub:                   hub,
 		wsHandler:        wsHandler,
 		watcher:          watcher,
 		taskRunner:       taskRunner,
