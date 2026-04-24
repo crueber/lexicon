@@ -152,6 +152,9 @@ func New(cfg Config) (*Server, error) {
 	bookHdlr.WithShelfHandler(shelfHdlr)
 	bookHdlr.WithAuditService(auditSvc)
 	bookHdlr.WithContentRestrictionService(contentRestrictionSvc)
+	bookHdlr.WithBroadcastBookDeletedFunc(func(bookID int64) {
+		hub.BroadcastBookDeleted(bookID)
+	})
 
 	userSvc := user.NewService(db, func(userID int64, msgType string, payload any) {
 		hub.BroadcastToUser(userID, ws.Message{Type: msgType, Payload: payload})

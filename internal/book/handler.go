@@ -31,6 +31,7 @@ type Handler struct {
 	shelfHandler          shelfHandler
 	auditSvc              *audit.Service
 	contentRestrictionSvc *contentrestriction.Service
+	broadcastBookDeleted  func(bookID int64)
 }
 
 // NewHandler creates a new book Handler.
@@ -54,6 +55,11 @@ func (h *Handler) WithAuditService(svc *audit.Service) {
 // WithContentRestrictionService sets the content restriction service for filtering book listings.
 func (h *Handler) WithContentRestrictionService(svc *contentrestriction.Service) {
 	h.contentRestrictionSvc = svc
+}
+
+// WithBroadcastBookDeletedFunc sets the function called after a book is successfully deleted.
+func (h *Handler) WithBroadcastBookDeletedFunc(fn func(bookID int64)) {
+	h.broadcastBookDeleted = fn
 }
 
 // Routes registers all book routes on the given router.
@@ -703,6 +709,10 @@ func (h *Handler) handleDelete(w http.ResponseWriter, r *http.Request) {
 		h.logger.Error("delete book", "book_id", id, "error", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
+	}
+
+	if h.broadcastBookDeleted != nil {
+		h.broadcastBookDeleted(id)
 	}
 
 	if h.auditSvc != nil {

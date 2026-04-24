@@ -120,3 +120,8 @@ func (h *Hub) BroadcastToAll(msg Message) {
 func (h *Hub) BroadcastBookUpdated(bookID int64) {
 	h.BroadcastToAll(Message{Type: "BOOK_UPDATED", Payload: fmt.Sprintf("%d", bookID)})
 }
+
+// BroadcastBookDeleted broadcasts a BOOK_DELETED message to all clients.
+func (h *Hub) BroadcastBookDeleted(bookID int64) {
+	h.BroadcastToAll(Message{Type: "BOOK_DELETED", Payload: fmt.Sprintf("%d", bookID)})
+}

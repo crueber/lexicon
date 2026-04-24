@@ -205,10 +205,17 @@ const LibraryBrowserInner: Component<{ libraryId: number }> = (props) => {
   };
   window.addEventListener("book-updated", handleBookUpdated);
 
+  // Listen for book-deleted custom events (from WebSocket BOOK_DELETED) to refetch.
+  const handleBookDeleted = () => {
+    void refetchBooks();
+  };
+  window.addEventListener("book-deleted", handleBookDeleted);
+
   onCleanup(() => {
     unsubScanComplete();
     unsubBookAdded();
     window.removeEventListener("book-updated", handleBookUpdated);
+    window.removeEventListener("book-deleted", handleBookDeleted);
   });
 
   const totalPages = createMemo(() => {
