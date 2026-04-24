@@ -72,6 +72,11 @@ func (h *OIDCHandler) HandleAuthorize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	redirectURL := r.URL.Query().Get("redirect")
+	// Only allow same-origin relative paths to prevent open redirect attacks.
+	if redirectURL != "" && !isValidRedirectPath(redirectURL) {
+		writeError(w, http.StatusBadRequest, "invalid redirect")
+		return
+	}
 
 	state, nonce, err := h.service.GenerateState(redirectURL)
 	if err != nil {
@@ -170,13 +175,24 @@ func (h *OIDCHandler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// Redirect to frontend with tokens.
-	redirectTarget := "/login"
-	if result.RedirectURL != "" {
-		redirectTarget = result.RedirectURL
-	}
-	redirectURL := redirectTarget + "?token=" + accessToken + "&refresh=" + plainRefresh
+	// Redirect to frontend with tokens. Always use /login to prevent open
+	// redirects — the redirect path was validated in HandleAuthorize but we
+	// never redirect to an arbitrary host.
+	redirectURL := "/login?token=" + accessToken + "&refresh=" + plainRefresh
 	http.Redirect(w, r, redirectURL, http.StatusFound)
+}
+
+// isValidRedirectPath reports whether redirect is a safe same-origin path.
+func isValidRedirectPath(redirect string) bool {
+	// Must start with / and not contain a host or protocol.
+	if !strings.HasPrefix(redirect, "/") {
+		return false
+	}
+	// Reject protocol-relative URLs and anything that looks like a full URL.
+	if strings.HasPrefix(redirect, "//") {
+		return false
+	}
+	return true
 }
 
 // findOrCreateUser looks up a user by email or creates one from OIDC claims.

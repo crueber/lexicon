@@ -59,7 +59,6 @@ type ProviderResponse struct {
 	Host        string `json:"host"`
 	Port        int64  `json:"port"`
 	Username    string `json:"username"`
-	Password    string `json:"password"`
 	FromAddress string `json:"fromAddress"`
 	UseTLS      bool   `json:"useTls"`
 	IsDefault   bool   `json:"isDefault"`
@@ -73,7 +72,6 @@ func toProviderResponse(p EmailProvider) ProviderResponse {
 		Host:        p.Host,
 		Port:        p.Port,
 		Username:    p.Username,
-		Password:    p.Password,
 		FromAddress: p.FromAddress,
 		UseTLS:      p.UseTls == 1,
 		IsDefault:   p.IsDefault == 1,

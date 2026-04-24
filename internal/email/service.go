@@ -2,7 +2,10 @@ package email
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/tls"
 	"database/sql"
 	"encoding/base64"
@@ -11,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mime"
 	"mime/multipart"
 	"net"
 	"net/smtp"
@@ -26,11 +30,12 @@ import (
 type Service struct {
 	db     *sql.DB
 	logger *slog.Logger
+	secret string
 }
 
 // NewService creates a new email Service.
-func NewService(db *sql.DB, logger *slog.Logger) *Service {
-	return &Service{db: db, logger: logger}
+func NewService(db *sql.DB, logger *slog.Logger, secret string) *Service {
+	return &Service{db: db, logger: logger, secret: secret}
 }
 
 // CreateProviderParams holds parameters for creating an email provider.
@@ -98,12 +103,17 @@ func (s *Service) CreateProvider(ctx context.Context, params CreateProviderParam
 		}
 	}
 
+	encryptedPassword, err := encryptPassword(params.Password, s.secret)
+	if err != nil {
+		return EmailProvider{}, fmt.Errorf("encrypt password: %w", err)
+	}
+
 	provider, err := q.CreateEmailProvider(ctx, CreateEmailProviderParams{
 		Name:        params.Name,
 		Host:        params.Host,
 		Port:        params.Port,
 		Username:    params.Username,
-		Password:    params.Password,
+		Password:    encryptedPassword,
 		FromAddress: params.FromAddress,
 		UseTls:      boolToInt(params.UseTLS),
 		IsDefault:   boolToInt(params.IsDefault),
@@ -133,12 +143,17 @@ func (s *Service) UpdateProvider(ctx context.Context, id int64, params UpdatePro
 		}
 	}
 
+	encryptedPassword, err := encryptPassword(params.Password, s.secret)
+	if err != nil {
+		return fmt.Errorf("encrypt password: %w", err)
+	}
+
 	if err := q.UpdateEmailProvider(ctx, UpdateEmailProviderParams{
 		Name:        params.Name,
 		Host:        params.Host,
 		Port:        params.Port,
 		Username:    params.Username,
-		Password:    params.Password,
+		Password:    encryptedPassword,
 		FromAddress: params.FromAddress,
 		UseTls:      boolToInt(params.UseTLS),
 		IsDefault:   boolToInt(params.IsDefault),
@@ -322,7 +337,12 @@ func (s *Service) sendSMTP(provider EmailProvider, to []string, subject, bodyTex
 		}
 	}
 
-	auth := smtp.PlainAuth("", provider.Username, provider.Password, provider.Host)
+	password, err := decryptPassword(provider.Password, s.secret)
+	if err != nil {
+		return fmt.Errorf("decrypt provider password: %w", err)
+	}
+
+	auth := smtp.PlainAuth("", provider.Username, password, provider.Host)
 	if err := client.Auth(auth); err != nil {
 		return fmt.Errorf("smtp auth: %w", err)
 	}
@@ -381,7 +401,7 @@ func writeEmailMessage(w io.Writer, from string, to []string, subject, bodyText,
 	if attachmentPath != "" {
 		fileHeaders := textproto.MIMEHeader{}
 		fileHeaders.Set("Content-Type", "application/octet-stream")
-		fileHeaders.Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, attachmentName))
+		fileHeaders.Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, mime.QEncoding.Encode("utf-8", strings.ReplaceAll(attachmentName, `"`, ``))))
 		fileHeaders.Set("Content-Transfer-Encoding", "base64")
 		filePart, err := mpWriter.CreatePart(fileHeaders)
 		if err != nil {
@@ -434,4 +454,53 @@ func nullString(s *string) sql.NullString {
 		return sql.NullString{}
 	}
 	return sql.NullString{String: *s, Valid: true}
+}
+
+func deriveKey(secret string) []byte {
+	h := sha256.Sum256([]byte(secret))
+	return h[:]
+}
+
+func encryptPassword(plaintext, secret string) (string, error) {
+	key := deriveKey(secret)
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", err
+	}
+	ciphertext := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
+	return base64.StdEncoding.EncodeToString(ciphertext), nil
+}
+
+func decryptPassword(ciphertextB64, secret string) (string, error) {
+	key := deriveKey(secret)
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	ciphertext, err := base64.StdEncoding.DecodeString(ciphertextB64)
+	if err != nil {
+		return "", err
+	}
+	nonceSize := gcm.NonceSize()
+	if len(ciphertext) < nonceSize {
+		return "", errors.New("ciphertext too short")
+	}
+	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return "", err
+	}
+	return string(plaintext), nil
 }

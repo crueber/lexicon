@@ -312,7 +312,7 @@ func New(cfg Config) (*Server, error) {
 		logger.Warn("failed to load app settings for auth config", "error", err)
 	}
 
-	oidcSvc, err := auth.NewOIDCService(db, oidcCfg)
+	oidcSvc, err := auth.NewOIDCService(db, oidcCfg, logger)
 	if err != nil {
 		logger.Warn("failed to create oidc service", "error", err)
 	}
@@ -323,7 +323,7 @@ func New(cfg Config) (*Server, error) {
 	bookdropHdlr := bookdrop.NewHandler(bookdropSvc, db, logger)
 	bookdropHdlr.WithAuditService(auditSvc)
 
-	emailSvc := email.NewService(db, logger)
+	emailSvc := email.NewService(db, logger, cfg.JWTSecret)
 	emailHdlr := email.NewHandler(emailSvc, logger)
 	emailHdlr.WithAuditService(auditSvc)
 

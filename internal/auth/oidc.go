@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -29,10 +30,11 @@ type OIDCService struct {
 	verifier     *oidc.IDTokenVerifier
 	oauth2Config *oauth2.Config
 	cfg          OIDCConfig
+	logger       *slog.Logger
 }
 
 // NewOIDCService creates an OIDC service. Returns nil if OIDC is not enabled.
-func NewOIDCService(db *sql.DB, cfg OIDCConfig) (*OIDCService, error) {
+func NewOIDCService(db *sql.DB, cfg OIDCConfig, logger *slog.Logger) (*OIDCService, error) {
 	if !cfg.Enabled || cfg.IssuerURI == "" {
 		return nil, nil
 	}
@@ -68,6 +70,7 @@ func NewOIDCService(db *sql.DB, cfg OIDCConfig) (*OIDCService, error) {
 		verifier:     verifier,
 		oauth2Config: oauth2Config,
 		cfg:          cfg,
+		logger:       logger,
 	}, nil
 }
 
@@ -152,7 +155,11 @@ func (s *OIDCService) HandleCallback(ctx context.Context, state, code string) (*
 	}
 
 	// Clean up session.
-	_, _ = s.db.ExecContext(ctx, "DELETE FROM oidc_session WHERE state = ?", state)
+	if _, err := s.db.ExecContext(ctx, "DELETE FROM oidc_session WHERE state = ?", state); err != nil {
+		if s.logger != nil {
+			s.logger.Warn("failed to delete oidc session", "state", state, "error", err)
+		}
+	}
 
 	result := &OIDCCallbackResult{
 		Email:       claims.Email,

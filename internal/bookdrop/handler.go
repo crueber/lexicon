@@ -118,14 +118,14 @@ func (h *Handler) handleImport(w http.ResponseWriter, r *http.Request) {
 		libraryID = &defaultID
 	}
 
-	bookID, err := h.svc.ImportFile(r.Context(), id, *libraryID)
+		bookID, err := h.svc.ImportFile(r.Context(), id, *libraryID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "bookdrop file not found")
 			return
 		}
 		h.logger.Error("import bookdrop file", "id", id, "library_id", *libraryID, "error", err)
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 
@@ -169,7 +169,7 @@ func (h *Handler) handleReject(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.logger.Error("reject bookdrop file", "id", id, "error", err)
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 

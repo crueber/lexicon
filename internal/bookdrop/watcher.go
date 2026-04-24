@@ -52,6 +52,7 @@ type Watcher struct {
 	fsWatcher *fsnotify.Watcher
 	mu        sync.Mutex
 	watches   map[string]*fileWatch
+	ctx       context.Context
 }
 
 // NewWatcher creates a new BookDrop watcher.
@@ -75,6 +76,8 @@ func NewWatcher(dropPath string, db *sql.DB, logger *slog.Logger, hub *ws.Hub) (
 
 // Start begins watching the drop directory. It blocks until ctx is cancelled.
 func (w *Watcher) Start(ctx context.Context) error {
+	w.ctx = ctx
+
 	if err := w.fsWatcher.Add(w.dropPath); err != nil {
 		w.logger.Warn("failed to watch bookdrop path", "path", w.dropPath, "error", err)
 		// Still run the event loop so we can handle context cancellation.
@@ -236,7 +239,7 @@ func (w *Watcher) checkStability(path string) {
 	delete(w.watches, path)
 	w.mu.Unlock()
 
-	w.processStableFile(context.Background(), path)
+	w.processStableFile(w.ctx, path)
 }
 
 // cancelAllTimers stops all pending stability timers.
