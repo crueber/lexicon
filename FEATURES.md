@@ -98,6 +98,7 @@ A comprehensive feature list for Lexicon, a self-hosted digital library manager.
 - **Custom font support in EPUB** — Users can upload custom fonts and use them in the EPUB reader.
 - **PDF reader settings** — Configurable spread mode and theme.
 - **Audiobook player settings** — Configurable playback speed and theme.
+- **PDF annotations** — Page-based notes with color picker, annotation sidebar, and thumbnail indicators.
 - **Reader settings persistence** — Per-user reader preferences are saved to the database.
 - **Full-screen reading mode** — All readers support full-screen display.
 - **Keyboard navigation** — Arrow keys and spacebar for page/chapter navigation.
@@ -125,6 +126,7 @@ A comprehensive feature list for Lexicon, a self-hosted digital library manager.
 - **Annotation CRUD** — Create, list, update, and delete annotations via API.
 - **Unified notebook view** — Paginated cross-book view of all annotations with filtering by book, color, and text search.
 - **Content restriction filtering in notebook** — Restrictions apply to notebook results so users only see annotations for accessible books.
+- **Markdown export** — Export all annotations to a downloadable Markdown file grouped by book.
 
 ---
 
@@ -280,7 +282,4 @@ A comprehensive feature list for Lexicon, a self-hosted digital library manager.
 
 ## Not Yet Implemented
 
-These features are specified in the implementation plan but have not been built:
-
-- **Markdown export for notebook** — Export all annotations to a Markdown file.
-- **PDF annotations** — Page-based highlights and notes in the PDF reader.
+All planned features have been implemented.
