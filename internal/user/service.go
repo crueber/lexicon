@@ -8,6 +8,33 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// BroadcastFunc sends a WebSocket message to all connections for a user.
+type BroadcastFunc func(userID int64, msgType string, payload any)
+
+// Service provides higher-level user operations.
+type Service struct {
+	db        *sql.DB
+	broadcast BroadcastFunc
+}
+
+// NewService creates a new user Service with an optional broadcast function.
+func NewService(db *sql.DB, broadcast BroadcastFunc) *Service {
+	return &Service{db: db, broadcast: broadcast}
+}
+
+// RevokeAllUserRefreshTokens deletes all refresh tokens for a user and
+// broadcasts SESSION_REVOKED to their active WebSocket connections.
+func (s *Service) RevokeAllUserRefreshTokens(ctx context.Context, userID int64) error {
+	q := New(s.db)
+	if err := q.RevokeAllUserRefreshTokens(ctx, userID); err != nil {
+		return fmt.Errorf("delete refresh tokens: %w", err)
+	}
+	if s.broadcast != nil {
+		s.broadcast(userID, "SESSION_REVOKED", "")
+	}
+	return nil
+}
+
 // HashPassword hashes a plaintext password using bcrypt with the default cost.
 func HashPassword(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

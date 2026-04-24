@@ -153,10 +153,14 @@ func New(cfg Config) (*Server, error) {
 	bookHdlr.WithAuditService(auditSvc)
 	bookHdlr.WithContentRestrictionService(contentRestrictionSvc)
 
+	userSvc := user.NewService(db, func(userID int64, msgType string, payload any) {
+		hub.BroadcastToUser(userID, ws.Message{Type: msgType, Payload: payload})
+	})
+
 	// Build the user handler with injected dependencies to avoid import cycles.
 	// The user package cannot import auth (auth imports user), so we inject
 	// the principal extractor and library access setter as functions.
-	userHdlr := user.NewHandler(db, logger,
+	userHdlr := user.NewHandler(db, userSvc, logger,
 		func(ctx context.Context) *user.Principal {
 			p := auth.PrincipalFromContext(ctx)
 			if p == nil {

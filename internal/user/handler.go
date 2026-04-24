@@ -39,6 +39,7 @@ type LibraryAccessSetter func(ctx context.Context, db *sql.DB, userID int64, lib
 // Handler handles HTTP requests for user management.
 type Handler struct {
 	db               *sql.DB
+	svc              *Service
 	logger           *slog.Logger
 	getPrincipal     PrincipalExtractor
 	setLibraryAccess LibraryAccessSetter
@@ -48,9 +49,10 @@ type Handler struct {
 // NewHandler creates a new user Handler.
 // getPrincipal extracts the authenticated principal from a request context.
 // setLibraryAccess replaces all library access for a user.
-func NewHandler(db *sql.DB, logger *slog.Logger, getPrincipal PrincipalExtractor, setLibraryAccess LibraryAccessSetter) *Handler {
+func NewHandler(db *sql.DB, svc *Service, logger *slog.Logger, getPrincipal PrincipalExtractor, setLibraryAccess LibraryAccessSetter) *Handler {
 	return &Handler{
 		db:               db,
+		svc:              svc,
 		logger:           logger,
 		getPrincipal:     getPrincipal,
 		setLibraryAccess: setLibraryAccess,
@@ -473,7 +475,7 @@ func (h *Handler) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Revoke all refresh tokens so the user must re-login.
-	if err := q.RevokeAllUserRefreshTokens(ctx, id); err != nil {
+	if err := h.svc.RevokeAllUserRefreshTokens(ctx, id); err != nil {
 		h.logger.Error("revoke refresh tokens after password reset", "error", err)
 		// Non-fatal: password was changed, tokens will expire naturally.
 	}
