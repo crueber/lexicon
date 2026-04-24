@@ -234,3 +234,14 @@ INSERT OR IGNORE INTO book_mood (book_id, mood_id) VALUES (?, ?);
 
 -- name: ListBookMoods :many
 SELECT m.* FROM mood m JOIN book_mood bm ON m.id = bm.mood_id WHERE bm.book_id = ?;
+
+-- name: UpdateBookMetadata :exec
+UPDATE book_metadata
+SET title = COALESCE(?1, title),
+    description = COALESCE(?2, description),
+    publisher = COALESCE(?3, publisher),
+    publish_date = COALESCE(?4, publish_date),
+    language = COALESCE(?5, language),
+    isbn_10 = COALESCE(?6, isbn_10),
+    isbn_13 = COALESCE(?7, isbn_13)
+WHERE book_id = ?8;

@@ -1276,6 +1276,43 @@ func (q *Queries) UpdateBookFilePath(ctx context.Context, arg UpdateBookFilePath
 	return err
 }
 
+const updateBookMetadata = `-- name: UpdateBookMetadata :exec
+UPDATE book_metadata
+SET title = COALESCE(?1, title),
+    description = COALESCE(?2, description),
+    publisher = COALESCE(?3, publisher),
+    publish_date = COALESCE(?4, publish_date),
+    language = COALESCE(?5, language),
+    isbn_10 = COALESCE(?6, isbn_10),
+    isbn_13 = COALESCE(?7, isbn_13)
+WHERE book_id = ?8
+`
+
+type UpdateBookMetadataParams struct {
+	Title       sql.NullString `json:"title"`
+	Description sql.NullString `json:"description"`
+	Publisher   sql.NullString `json:"publisher"`
+	PublishDate sql.NullString `json:"publish_date"`
+	Language    sql.NullString `json:"language"`
+	Isbn10      sql.NullString `json:"isbn_10"`
+	Isbn13      sql.NullString `json:"isbn_13"`
+	BookID      int64          `json:"book_id"`
+}
+
+func (q *Queries) UpdateBookMetadata(ctx context.Context, arg UpdateBookMetadataParams) error {
+	_, err := q.db.ExecContext(ctx, updateBookMetadata,
+		arg.Title,
+		arg.Description,
+		arg.Publisher,
+		arg.PublishDate,
+		arg.Language,
+		arg.Isbn10,
+		arg.Isbn13,
+		arg.BookID,
+	)
+	return err
+}
+
 const upsertBookMetadata = `-- name: UpsertBookMetadata :exec
 INSERT INTO book_metadata (book_id, title, original_title, subtitle, description, publisher, publish_date, page_count, language, isbn_10, isbn_13)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

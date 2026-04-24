@@ -32,6 +32,7 @@ type Handler struct {
 	auditSvc              *audit.Service
 	contentRestrictionSvc *contentrestriction.Service
 	broadcastBookDeleted  func(bookID int64)
+	broadcastBookUpdated  func(bookID int64)
 }
 
 // NewHandler creates a new book Handler.
@@ -62,6 +63,11 @@ func (h *Handler) WithBroadcastBookDeletedFunc(fn func(bookID int64)) {
 	h.broadcastBookDeleted = fn
 }
 
+// WithBroadcastBookUpdatedFunc sets the function called after a book is successfully updated.
+func (h *Handler) WithBroadcastBookUpdatedFunc(fn func(bookID int64)) {
+	h.broadcastBookUpdated = fn
+}
+
 // Routes registers all book routes on the given router.
 // RequireAuth must already be applied by the caller.
 func (h *Handler) Routes(r chi.Router) {
@@ -69,6 +75,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/duplicates", h.handleListDuplicates)
 	r.Post("/duplicates/dismiss", h.handleDismissDuplicate)
 	r.Post("/merge", h.handleMergeBooks)
+	r.Put("/{id}/metadata", h.handleUpdateMetadata)
 	r.Get("/{id}", h.handleGet)
 	r.Delete("/{id}", h.handleDelete)
 	r.Get("/{id}/files", h.handleListFiles)
@@ -669,6 +676,66 @@ func (h *Handler) handleGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleUpdateMetadata handles PUT /api/books/{id}/metadata (admin only).
+func (h *Handler) handleUpdateMetadata(w http.ResponseWriter, r *http.Request) {
+	principal := auth.PrincipalFromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	if !principal.IsAdmin() {
+		writeError(w, http.StatusForbidden, "admin access required")
+		return
+	}
+
+	bookID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid book id")
+		return
+	}
+
+	var req struct {
+		Title         string `json:"title"`
+		Description   string `json:"description"`
+		Publisher     string `json:"publisher"`
+		PublishedDate string `json:"publishedDate"`
+		Language      string `json:"language"`
+		ISBN10        string `json:"isbn10"`
+		ISBN13        string `json:"isbn13"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	q := New(h.db)
+	ctx := r.Context()
+
+	// Update book_metadata directly (admin bypasses field locks).
+	err = q.UpdateBookMetadata(ctx, UpdateBookMetadataParams{
+		BookID:        bookID,
+		Title:         sql.NullString{String: req.Title, Valid: req.Title != ""},
+		Description:   sql.NullString{String: req.Description, Valid: req.Description != ""},
+		Publisher:     sql.NullString{String: req.Publisher, Valid: req.Publisher != ""},
+		PublishDate: sql.NullString{String: req.PublishedDate, Valid: req.PublishedDate != ""},
+		Language:    sql.NullString{String: req.Language, Valid: req.Language != ""},
+		Isbn10:      sql.NullString{String: req.ISBN10, Valid: req.ISBN10 != ""},
+		Isbn13:      sql.NullString{String: req.ISBN13, Valid: req.ISBN13 != ""},
+	})
+	if err != nil {
+		h.logger.Error("update book metadata", "book_id", bookID, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	// Broadcast BOOK_UPDATED.
+	if h.broadcastBookUpdated != nil {
+		h.broadcastBookUpdated(bookID)
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // handleDelete handles DELETE /api/books/{id} (admin only).
