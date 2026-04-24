@@ -7,7 +7,7 @@ import {
   For,
 } from "solid-js";
 import { createStore, produce } from "solid-js/store";
-import { User, Lock, Palette, Save, Shield, Trash2 } from "lucide-solid";
+import { User, Lock, Palette, Save, Shield, Trash2, Mail, Plus } from "lucide-solid";
 import { api } from "../../shared/api/client";
 import { useAuth } from "./AuthProvider";
 import Button from "../../shared/ui/Button";
@@ -507,6 +507,137 @@ const ContentRestrictionsSection: Component = () => {
   );
 };
 
+// --- Email Recipients Section ---
+
+interface EmailRecipient {
+  id: number;
+  name?: string;
+  emailAddress: string;
+  createdAt: string;
+}
+
+async function fetchEmailRecipients(): Promise<EmailRecipient[]> {
+  return api<EmailRecipient[]>("/email/recipients");
+}
+
+async function createEmailRecipient(data: { name?: string; emailAddress: string }): Promise<EmailRecipient> {
+  return api<EmailRecipient>("/email/recipients", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+async function deleteEmailRecipient(id: number): Promise<void> {
+  await api(`/email/recipients/${id}`, { method: "DELETE" });
+}
+
+const EmailRecipientsSection: Component = () => {
+  const [recipients, { refetch }] = createResource(fetchEmailRecipients);
+  const [form, setForm] = createStore({ name: "", emailAddress: "" });
+  const [loading, setLoading] = createSignal(false);
+  const [error, setError] = createSignal("");
+
+  async function handleAdd(e: Event) {
+    e.preventDefault();
+    if (!form.emailAddress.trim()) {
+      setError(t("common.emailRequired"));
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      await createEmailRecipient({
+        name: form.name.trim() || undefined,
+        emailAddress: form.emailAddress.trim(),
+      });
+      setForm(produce((s) => {
+        s.name = "";
+        s.emailAddress = "";
+      }));
+      showToast(t("common.recipientAdded"), "success");
+      refetch();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : t("common.failedToAddRecipient"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDelete(id: number) {
+    try {
+      await deleteEmailRecipient(id);
+      showToast(t("common.recipientRemoved"), "success");
+      refetch();
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : t("common.failedToRemoveRecipient"), "error");
+    }
+  }
+
+  return (
+    <section class="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+      <h2 class="mb-4 flex items-center gap-2 text-base font-semibold text-slate-100">
+        <Mail class="h-5 w-5 text-indigo-400" />
+        {t("common.sendToDeviceRecipients")}
+      </h2>
+      <Show when={!recipients.loading} fallback={<p class="text-sm text-slate-400">{t("common.loading")}</p>}>
+        <div class="flex flex-col gap-4">
+          <Show when={(recipients() ?? []).length > 0}>
+            <div class="flex flex-col gap-2">
+              <For each={recipients() ?? []}>
+                {(r) => (
+                  <div class="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800 px-3 py-2">
+                    <div class="flex flex-col">
+                      <Show when={r.name}>
+                        <span class="text-sm font-medium text-slate-200">{r.name}</span>
+                      </Show>
+                      <span class="text-sm text-slate-300">{r.emailAddress}</span>
+                    </div>
+                    <button
+                      onClick={() => handleDelete(r.id)}
+                      class="rounded p-1 text-slate-400 hover:bg-red-600/20 hover:text-red-400 transition-colors"
+                      title={t("common.remove")}
+                    >
+                      <Trash2 class="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Show>
+
+          <form onSubmit={handleAdd} class="flex flex-col gap-3">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Input
+                label={t("common.displayName")}
+                value={form.name}
+                onInput={(e) => setForm("name", e.currentTarget.value)}
+                placeholder={t("common.optional")}
+              />
+              <Input
+                label={t("common.email")}
+                type="email"
+                value={form.emailAddress}
+                onInput={(e) => setForm("emailAddress", e.currentTarget.value)}
+                placeholder={t("common.youAtExample")}
+                required
+              />
+            </div>
+            <Show when={error()}>
+              <p class="text-sm text-red-400">{error()}</p>
+            </Show>
+            <div class="flex justify-end">
+              <Button type="submit" loading={loading()}>
+                <Plus class="h-4 w-4" />
+                {t("common.addRecipient")}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </Show>
+    </section>
+  );
+};
+
 // --- Settings Page ---
 
 const SettingsPage: Component = () => {
@@ -526,6 +657,7 @@ const SettingsPage: Component = () => {
           <ProfileSection />
           <PasswordSection />
           <AppearanceSection />
+          <EmailRecipientsSection />
           <ContentRestrictionsSection />
         </div>
       </div>

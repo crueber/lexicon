@@ -12,16 +12,25 @@ import {
   X,
   Notebook as NotebookIcon,
   ClipboardList,
+  User,
+  Inbox,
+  List,
+  Mail,
 } from "lucide-solid";
 import { t } from "./shared/i18n/i18n";
 import AuthProvider, { useAuth } from "./features/auth/AuthProvider";
 import LoginPage from "./features/auth/LoginPage";
+import OidcCallback from "./features/auth/OidcCallback";
 import ProtectedRoute from "./features/auth/ProtectedRoute";
 import SettingsPage from "./features/auth/SettingsPage";
 import Dashboard from "./features/dashboard/Dashboard";
 import LibraryList from "./features/library/LibraryList";
 import LibraryBrowser from "./features/library/LibraryBrowser";
 import BookDetail from "./features/book/BookDetail";
+import AuthorList from "./features/book/AuthorList";
+import AuthorDetail from "./features/book/AuthorDetail";
+import SeriesList from "./features/book/SeriesList";
+import SeriesDetail from "./features/book/SeriesDetail";
 import EpubReader from "./features/reader/EpubReader";
 import PdfReader from "./features/reader/PdfReader";
 import ComicReader from "./features/reader/ComicReader";
@@ -33,15 +42,13 @@ import MagicShelfBuilder from "./features/shelf/MagicShelfBuilder";
 import MagicShelfDetail from "./features/shelf/MagicShelfDetail";
 import UserManagement from "./features/admin/UserManagement";
 import AuditLogs from "./features/admin/AuditLogs";
+import AdminSettings from "./features/admin/AdminSettings";
+import TaskMonitor from "./features/admin/TaskMonitor";
+import EmailSettings from "./features/admin/EmailSettings";
 import Notebook from "./features/notebook/Notebook";
+import BookDropQueue from "./features/bookdrop/BookDropQueue";
 import ToastContainer from "./shared/ui/Toast";
 import WSProvider from "./shared/ws/WSProvider";
-
-const AdminSettingsStub: Component = () => (
-  <div class="flex flex-1 items-center justify-center p-8">
-    <p class="text-slate-400">{t("common.adminSettingsComingSoon")}</p>
-  </div>
-);
 
 // --- Sidebar ---
 
@@ -90,8 +97,11 @@ const Sidebar: Component = () => {
       <nav class="flex flex-1 flex-col gap-1 px-3 py-4">
         <NavItem href="/" icon={LayoutDashboard} label={t("common.dashboard")} />
         <NavItem href="/libraries" icon={Library} label={t("common.libraries")} />
+        <NavItem href="/authors" icon={User} label={t("common.authors")} />
+        <NavItem href="/series" icon={BookMarked} label={t("common.series")} />
         <NavItem href="/shelves" icon={BookMarked} label={t("common.shelves")} />
         <NavItem href="/notebook" icon={NotebookIcon} label={t("common.notebook")} />
+        <NavItem href="/bookdrop" icon={Inbox} label={t("common.bookdrop")} />
 
         <Show when={auth.isAdmin()}>
           <div class="mt-6 mb-2 px-3">
@@ -102,6 +112,8 @@ const Sidebar: Component = () => {
           <NavItem href="/admin/users" icon={Users} label={t("common.users")} />
           <NavItem href="/admin/audit-logs" icon={ClipboardList} label={t("common.auditLogs")} />
           <NavItem href="/admin/settings" icon={Settings} label={t("common.settings")} />
+          <NavItem href="/admin/email" icon={Mail} label={t("common.email")} />
+          <NavItem href="/tasks" icon={List} label={t("common.tasks")} />
         </Show>
       </nav>
 
@@ -167,13 +179,19 @@ const MobileNav: Component = () => {
         />
         <div class="fixed bottom-14 left-0 right-0 z-30 rounded-t-xl border-t border-slate-800 bg-slate-900 p-4 md:hidden">
           <div class="flex flex-col gap-2">
+            <NavItem href="/authors" icon={User} label={t("common.authors")} onClick={() => setMenuOpen(false)} />
+            <NavItem href="/series" icon={BookMarked} label={t("common.series")} onClick={() => setMenuOpen(false)} />
+            <NavItem href="/bookdrop" icon={Inbox} label={t("common.bookdrop")} onClick={() => setMenuOpen(false)} />
             <Show when={auth.isAdmin()}>
+              <div class="my-2 border-t border-slate-800" />
               <p class="px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
                 {t("common.admin")}
               </p>
               <NavItem href="/admin/users" icon={Users} label={t("common.users")} onClick={() => setMenuOpen(false)} />
               <NavItem href="/admin/audit-logs" icon={ClipboardList} label={t("common.auditLogs")} onClick={() => setMenuOpen(false)} />
               <NavItem href="/admin/settings" icon={Settings} label={t("common.settings")} onClick={() => setMenuOpen(false)} />
+              <NavItem href="/admin/email" icon={Mail} label={t("common.email")} onClick={() => setMenuOpen(false)} />
+              <NavItem href="/tasks" icon={List} label={t("common.tasks")} onClick={() => setMenuOpen(false)} />
               <div class="my-2 border-t border-slate-800" />
             </Show>
             <NavItem href="/settings" icon={Settings} label={t("common.settings")} onClick={() => setMenuOpen(false)} />
@@ -258,6 +276,7 @@ const App: Component = () => {
       )}
     >
       <Route path="/login" component={LoginPage} />
+      <Route path="/auth/oidc/callback" component={OidcCallback} />
       {/* Reader routes: full-screen, no sidebar, but still require auth */}
       <Route path="/books/:id/read" component={ReaderDispatch} />
       <Route path="/books/:id/read/epub" component={EpubReader} />
@@ -269,16 +288,23 @@ const App: Component = () => {
         <Route path="/libraries" component={LibraryList} />
         <Route path="/libraries/:id/books" component={LibraryBrowser} />
         <Route path="/books/:id" component={BookDetail} />
+        <Route path="/authors" component={AuthorList} />
+        <Route path="/authors/:id" component={AuthorDetail} />
+        <Route path="/series" component={SeriesList} />
+        <Route path="/series/:id" component={SeriesDetail} />
         <Route path="/shelves" component={ShelfList} />
         <Route path="/shelves/:id" component={ShelfDetail} />
         <Route path="/magic-shelves/new" component={MagicShelfBuilder} />
         <Route path="/magic-shelves/:id" component={MagicShelfDetail} />
         <Route path="/magic-shelves/:id/edit" component={MagicShelfBuilder} />
         <Route path="/notebook" component={Notebook} />
+        <Route path="/bookdrop" component={BookDropQueue} />
         <Route path="/settings" component={SettingsPage} />
+        <Route path="/tasks" component={TaskMonitor} />
         <Route path="/admin/users" component={UserManagement} />
         <Route path="/admin/audit-logs" component={AuditLogs} />
-        <Route path="/admin/settings" component={AdminSettingsStub} />
+        <Route path="/admin/settings" component={AdminSettings} />
+        <Route path="/admin/email" component={EmailSettings} />
       </Route>
     </Router>
   );

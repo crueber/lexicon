@@ -16,18 +16,30 @@ import {
   clearTokens,
 } from "../../shared/api/client";
 
+export interface UserPermissions {
+  role: string;
+  canDownload: boolean;
+  canUpload: boolean;
+  canEmailSend: boolean;
+  canEditMetadata: boolean;
+  opdsAccess: boolean;
+}
+
 export interface User {
   id: number;
   username: string;
   email: string;
   name: string;
   role: string;
+  permissions?: UserPermissions;
+  libraryIds?: number[];
 }
 
 export interface AuthContextValue {
   user: () => User | null;
   isAuthenticated: () => boolean;
   isAdmin: () => boolean;
+  canEmailSend: () => boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   loading: () => boolean;
@@ -46,11 +58,12 @@ const AuthProvider: Component<{ children: JSX.Element }> = (props) => {
   const [loading, setLoading] = createSignal(true);
 
   const isAuthenticated = () => user() !== null;
-  const isAdmin = () => user()?.role === "ADMIN";
+  const isAdmin = () => (user()?.permissions?.role ?? user()?.role) === "ADMIN";
+  const canEmailSend = () => user()?.permissions?.canEmailSend ?? false;
 
   async function fetchMe(): Promise<User | null> {
     try {
-      return await api<User>("/auth/me");
+      return await api<User>("/users/me");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         clearTokens();
@@ -68,7 +81,9 @@ const AuthProvider: Component<{ children: JSX.Element }> = (props) => {
     });
     setAccessToken(resp.accessToken);
     setRefreshToken(resp.refreshToken);
-    setUser(resp.user);
+    // Fetch full user info with permissions.
+    const me = await fetchMe();
+    setUser(me ?? resp.user);
   }
 
   async function logout(): Promise<void> {
@@ -102,6 +117,7 @@ const AuthProvider: Component<{ children: JSX.Element }> = (props) => {
     user,
     isAuthenticated,
     isAdmin,
+    canEmailSend,
     login,
     logout,
     loading,

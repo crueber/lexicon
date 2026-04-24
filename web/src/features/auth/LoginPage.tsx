@@ -1,20 +1,51 @@
-import { type Component, createSignal, Show } from "solid-js";
-import { useNavigate } from "@solidjs/router";
+import {
+  type Component,
+  createSignal,
+  Show,
+  createResource,
+  onMount,
+} from "solid-js";
+import { useNavigate, useSearchParams } from "@solidjs/router";
 import { BookOpen } from "lucide-solid";
 import { useAuth } from "./AuthProvider";
-import { ApiError } from "../../shared/api/client";
+import { ApiError, setAccessToken, setRefreshToken } from "../../shared/api/client";
 import Button from "../../shared/ui/Button";
 import Input from "../../shared/ui/Input";
 import { t } from "../../shared/i18n/i18n";
+import { api } from "../../shared/api/client";
+
+interface OIDCProvider {
+  name: string;
+}
+
+async function fetchOIDCProviders(): Promise<OIDCProvider[]> {
+  return api<OIDCProvider[]>("/auth/oidc/providers");
+}
 
 const LoginPage: Component = () => {
   const auth = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [username, setUsername] = createSignal("");
   const [password, setPassword] = createSignal("");
   const [error, setError] = createSignal("");
   const [submitting, setSubmitting] = createSignal(false);
+  const [oidcLoading, setOidcLoading] = createSignal(false);
+
+  const [providers] = createResource(fetchOIDCProviders);
+
+  // Handle OIDC redirect with tokens.
+  onMount(() => {
+    const token = Array.isArray(searchParams.token) ? searchParams.token[0] : searchParams.token;
+    const refresh = Array.isArray(searchParams.refresh) ? searchParams.refresh[0] : searchParams.refresh;
+    if (token && refresh) {
+      setAccessToken(token);
+      setRefreshToken(refresh);
+      // Let AuthProvider handle the token validation on next render.
+      window.location.href = "/";
+    }
+  });
 
   async function handleSubmit(e: SubmitEvent) {
     e.preventDefault();
@@ -39,6 +70,13 @@ const LoginPage: Component = () => {
       setSubmitting(false);
     }
   }
+
+  function handleOIDCLogin(providerName: string) {
+    setOidcLoading(true);
+    window.location.href = `/api/auth/oidc/${encodeURIComponent(providerName)}/authorize`;
+  }
+
+  const oidcProvider = () => (providers() ?? [])[0];
 
   return (
     <div class="flex min-h-screen items-center justify-center bg-slate-900">
@@ -90,6 +128,29 @@ const LoginPage: Component = () => {
             {t("common.signIn")}
           </Button>
         </form>
+
+        {/* OIDC login */}
+        <Show when={oidcProvider()}>
+          <div class="mt-6 flex flex-col gap-3">
+            <div class="relative">
+              <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-slate-700" />
+              </div>
+              <div class="relative flex justify-center text-xs">
+                <span class="bg-slate-900 px-2 text-slate-500">{t("auth.or")}</span>
+              </div>
+            </div>
+            <Button
+              variant="secondary"
+              size="lg"
+              class="w-full"
+              loading={oidcLoading()}
+              onClick={() => handleOIDCLogin(oidcProvider()!.name)}
+            >
+              {t("auth.loginWith")} {oidcProvider()!.name}
+            </Button>
+          </div>
+        </Show>
       </div>
     </div>
   );

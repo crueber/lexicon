@@ -19,11 +19,15 @@ import {
   BookOpenCheck,
   BookMarked,
   Search,
+  Mail,
+  X,
+  CheckCircle,
 } from "lucide-solid";
 import { api } from "../../shared/api/client";
 import { useAuth } from "../auth/AuthProvider";
 import Button from "../../shared/ui/Button";
 import Skeleton from "../../shared/ui/Skeleton";
+import { showToast } from "../../shared/ui/Toast";
 import AddToShelfDialog from "../shelf/AddToShelfDialog";
 import MetadataSearch from "./MetadataSearch";
 import { t } from "../../shared/i18n/i18n";
@@ -41,6 +45,23 @@ async function fetchBookShelves(id: number): Promise<Shelf[]> {
 
 async function fetchSimilarBooks(id: number): Promise<SimilarBook[]> {
   return api<SimilarBook[]>(`/books/${id}/similar`);
+}
+
+interface EmailRecipient {
+  id: number;
+  name?: string;
+  emailAddress: string;
+}
+
+async function fetchEmailRecipients(): Promise<EmailRecipient[]> {
+  return api<EmailRecipient[]>("/email/recipients");
+}
+
+async function sendBookToDevice(bookId: number, recipientIds: number[]): Promise<void> {
+  await api(`/books/${bookId}/send`, {
+    method: "POST",
+    body: JSON.stringify({ recipientIds, providerId: 0 }),
+  });
 }
 
 // ---- Helpers ----
@@ -236,6 +257,10 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
   const [showShelfDialog, setShowShelfDialog] = createSignal(false);
   const [showMetadataSearch, setShowMetadataSearch] = createSignal(false);
+  const [showSendDialog, setShowSendDialog] = createSignal(false);
+  const [recipients] = createResource(fetchEmailRecipients);
+  const [selectedRecipientIds, setSelectedRecipientIds] = createSignal<number[]>([]);
+  const [sending, setSending] = createSignal(false);
 
   const isAudiobook = createMemo(() => book()?.bookType === "AUDIOBOOK");
 
@@ -311,6 +336,16 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
                 <Search class="h-4 w-4" />
                 {t("book.findMetadata")}
               </Button>
+              <Show when={auth.canEmailSend()}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowSendDialog(true)}
+                >
+                  <Mail class="h-4 w-4" />
+                  {t("book.sendToDevice")}
+                </Button>
+              </Show>
               <Show when={auth.isAdmin()}>
                 <Show
                   when={!showDeleteConfirm()}
@@ -578,6 +613,95 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
         bookType={book()!.bookType}
         onClose={() => setShowMetadataSearch(false)}
       />
+    </Show>
+
+    {/* Send to Device dialog */}
+    <Show when={showSendDialog()}>
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div class="w-full max-w-sm rounded-xl bg-slate-900 border border-slate-700 shadow-2xl">
+          <div class="flex items-center justify-between border-b border-slate-700 px-6 py-4">
+            <h2 class="text-lg font-semibold text-slate-100">{t("book.sendToDevice")}</h2>
+            <button
+              onClick={() => setShowSendDialog(false)}
+              class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
+            >
+              <X class="h-5 w-5" />
+            </button>
+          </div>
+          <div class="flex flex-col gap-4 p-6">
+            <Show when={!recipients.loading} fallback={<p class="text-sm text-slate-400">{t("common.loading")}</p>}>
+              <Show
+                when={(recipients() ?? []).length > 0}
+                fallback={<p class="text-sm text-slate-400">{t("book.noRecipients")}</p>}
+              >
+                <div class="flex flex-col gap-2">
+                  <For each={recipients() ?? []}>
+                    {(r) => {
+                      const isSelected = () => selectedRecipientIds().includes(r.id);
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedRecipientIds((prev) =>
+                              isSelected()
+                                ? prev.filter((id) => id !== r.id)
+                                : [...prev, r.id]
+                            );
+                          }}
+                          class={`flex items-center gap-3 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                            isSelected()
+                              ? "border-indigo-500 bg-indigo-600/20 text-indigo-300"
+                              : "border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600"
+                          }`}
+                        >
+                          <Show
+                            when={isSelected()}
+                            fallback={<div class="h-4 w-4 rounded border border-slate-600" />}
+                          >
+                            <CheckCircle class="h-4 w-4 text-indigo-400" />
+                          </Show>
+                          <div class="flex flex-col items-start">
+                            <Show when={r.name}>
+                              <span class="font-medium">{r.name}</span>
+                            </Show>
+                            <span class="text-xs text-slate-400">{r.emailAddress}</span>
+                          </div>
+                        </button>
+                      );
+                    }}
+                  </For>
+                </div>
+              </Show>
+            </Show>
+            <div class="flex justify-end gap-3">
+              <Button variant="secondary" size="sm" onClick={() => setShowSendDialog(false)}>
+                {t("common.cancel")}
+              </Button>
+              <Button
+                size="sm"
+                loading={sending()}
+                disabled={selectedRecipientIds().length === 0}
+                onClick={async () => {
+                  setSending(true);
+                  try {
+                    await sendBookToDevice(props.bookId, selectedRecipientIds());
+                    showToast(t("book.sentSuccessfully"), "success");
+                    setShowSendDialog(false);
+                    setSelectedRecipientIds([]);
+                  } catch (err: unknown) {
+                    showToast(err instanceof Error ? err.message : t("book.sendFailed"), "error");
+                  } finally {
+                    setSending(false);
+                  }
+                }}
+              >
+                <Mail class="h-4 w-4" />
+                {t("book.send")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
     </Show>
     </>
   );
