@@ -177,6 +177,67 @@ func (q *Queries) ListAllAnnotationsForUser(ctx context.Context, arg ListAllAnno
 	return items, nil
 }
 
+const listAllAnnotationsForUserExport = `-- name: ListAllAnnotationsForUserExport :many
+SELECT a.id, a.user_id, a.book_id, a.book_file_id, a.type, a.cfi, a.page_number, a.text, a.note, a.color, a.created_at, a.updated_at, bm.title as book_title
+FROM annotation a
+JOIN book_metadata bm ON bm.book_id = a.book_id
+WHERE a.user_id = ?
+ORDER BY bm.title, a.created_at DESC
+`
+
+type ListAllAnnotationsForUserExportRow struct {
+	ID         int64          `json:"id"`
+	UserID     int64          `json:"user_id"`
+	BookID     int64          `json:"book_id"`
+	BookFileID sql.NullInt64  `json:"book_file_id"`
+	Type       string         `json:"type"`
+	Cfi        sql.NullString `json:"cfi"`
+	PageNumber sql.NullInt64  `json:"page_number"`
+	Text       sql.NullString `json:"text"`
+	Note       sql.NullString `json:"note"`
+	Color      string         `json:"color"`
+	CreatedAt  string         `json:"created_at"`
+	UpdatedAt  string         `json:"updated_at"`
+	BookTitle  sql.NullString `json:"book_title"`
+}
+
+func (q *Queries) ListAllAnnotationsForUserExport(ctx context.Context, userID int64) ([]ListAllAnnotationsForUserExportRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAllAnnotationsForUserExport, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAllAnnotationsForUserExportRow{}
+	for rows.Next() {
+		var i ListAllAnnotationsForUserExportRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.BookID,
+			&i.BookFileID,
+			&i.Type,
+			&i.Cfi,
+			&i.PageNumber,
+			&i.Text,
+			&i.Note,
+			&i.Color,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.BookTitle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAnnotationsForBook = `-- name: ListAnnotationsForBook :many
 SELECT id, user_id, book_id, book_file_id, type, cfi, page_number, text, note, color, created_at, updated_at FROM annotation WHERE user_id = ? AND book_id = ?
 ORDER BY created_at DESC

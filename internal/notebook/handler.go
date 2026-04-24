@@ -3,9 +3,11 @@ package notebook
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -54,6 +56,7 @@ func (h *Handler) ReaderRoutes(r chi.Router) {
 // RequireAuth must already be applied by the caller.
 func (h *Handler) NotebookRoutes(r chi.Router) {
 	r.Get("/", h.handleListAllAnnotations)
+	r.Get("/export", h.handleExportMarkdown)
 }
 
 // ---- Request / Response types ----
@@ -456,6 +459,101 @@ func (h *Handler) handleListAllAnnotations(w http.ResponseWriter, r *http.Reques
 		"limit":       limit,
 		"offset":      offset,
 	})
+}
+
+// handleExportMarkdown handles GET /api/notebook/export.
+func (h *Handler) handleExportMarkdown(w http.ResponseWriter, r *http.Request) {
+	principal := auth.PrincipalFromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	q := New(h.db)
+	ctx := r.Context()
+
+	rows, err := q.ListAllAnnotationsForUserExport(ctx, principal.UserID)
+	if err != nil {
+		h.logger.Error("export markdown list annotations", "user_id", principal.UserID, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	// Apply content restrictions.
+	if h.contentRestrictionSvc != nil && !principal.IsAdmin() && len(rows) > 0 {
+		bookIDs := make([]int64, len(rows))
+		for i, row := range rows {
+			bookIDs[i] = row.BookID
+		}
+		filteredIDs, filterErr := h.contentRestrictionSvc.FilterBookIDs(ctx, principal.UserID, principal.IsAdmin(), bookIDs)
+		if filterErr != nil {
+			h.logger.Error("filter notebook export annotations", "error", filterErr)
+			// Non-fatal: continue without filtering.
+		} else {
+			idSet := make(map[int64]struct{}, len(filteredIDs))
+			for _, id := range filteredIDs {
+				idSet[id] = struct{}{}
+			}
+			var filtered []ListAllAnnotationsForUserExportRow
+			for _, row := range rows {
+				if _, ok := idSet[row.BookID]; ok {
+					filtered = append(filtered, row)
+				}
+			}
+			rows = filtered
+		}
+	}
+
+	// Group by book title.
+	type bookGroup struct {
+		title       string
+		annotations []ListAllAnnotationsForUserExportRow
+	}
+	var groups []bookGroup
+	var current *bookGroup
+	for _, row := range rows {
+		title := row.BookTitle.String
+		if title == "" {
+			title = fmt.Sprintf("Book %d", row.BookID)
+		}
+		if current == nil || current.title != title {
+			groups = append(groups, bookGroup{title: title, annotations: []ListAllAnnotationsForUserExportRow{row}})
+			current = &groups[len(groups)-1]
+		} else {
+			current.annotations = append(current.annotations, row)
+		}
+	}
+
+	var b strings.Builder
+	b.WriteString("# Notebook Export\n\n")
+	for _, g := range groups {
+		b.WriteString(fmt.Sprintf("## %s\n\n", g.title))
+		for _, a := range g.annotations {
+			var ref string
+			if a.PageNumber.Valid {
+				ref = fmt.Sprintf("Page %d", a.PageNumber.Int64)
+			} else if a.Cfi.Valid {
+				ref = fmt.Sprintf("CFI: %s", a.Cfi.String)
+			} else {
+				ref = "Note"
+			}
+
+			var text string
+			if a.Text.Valid && a.Text.String != "" {
+				text = fmt.Sprintf(" \"%s\"", a.Text.String)
+			}
+			b.WriteString(fmt.Sprintf("- **%s** —%s (%s)\n", ref, text, a.Color))
+			if a.Note.Valid && a.Note.String != "" {
+				b.WriteString(fmt.Sprintf("  - Note: %s\n", a.Note.String))
+			}
+			b.WriteString("\n")
+		}
+	}
+
+	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="notebook.md"`)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(b.String()))
 }
 
 // ---- Helpers ----

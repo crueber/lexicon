@@ -9,8 +9,8 @@ import {
   ErrorBoundary,
 } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { BookOpen, Trash2, Search, Filter } from "lucide-solid";
-import { api } from "../../shared/api/client";
+import { BookOpen, Trash2, Search, Filter, Download } from "lucide-solid";
+import { api, getAccessToken } from "../../shared/api/client";
 import { t } from "../../shared/i18n/i18n";
 
 // ---- Types ----
@@ -73,6 +73,23 @@ async function fetchNotebook(page: number): Promise<NotebookResponse> {
 
 async function deleteAnnotation(id: number, bookId: number): Promise<void> {
   await api(`/reader/books/${bookId}/annotations/${id}`, { method: "DELETE" });
+}
+
+async function exportNotebookMarkdown(): Promise<void> {
+  const accessToken = getAccessToken();
+  const response = await fetch("/api/notebook/export", {
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+  });
+  if (!response.ok) throw new Error("export failed");
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "notebook.md";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
 }
 
 // ---- Notebook component ----
@@ -209,6 +226,16 @@ const Notebook: Component = () => {
             </For>
           </select>
         </Show>
+
+        {/* Export */}
+        <button
+          onClick={() => exportNotebookMarkdown().catch(() => {})}
+          class="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 transition-colors"
+          title={t("notebook.exportMarkdown")}
+        >
+          <Download class="h-4 w-4" />
+          <span class="hidden sm:inline">{t("notebook.exportMarkdown")}</span>
+        </button>
       </div>
 
       {/* Content */}

@@ -29,5 +29,12 @@ WHERE a.user_id = ?
 ORDER BY a.created_at DESC
 LIMIT ? OFFSET ?;
 
+-- name: ListAllAnnotationsForUserExport :many
+SELECT a.*, bm.title as book_title
+FROM annotation a
+JOIN book_metadata bm ON bm.book_id = a.book_id
+WHERE a.user_id = ?
+ORDER BY bm.title, a.created_at DESC;
+
 -- name: CountAnnotationsForUser :one
 SELECT COUNT(*) FROM annotation WHERE user_id = ?;
