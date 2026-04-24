@@ -34,5 +34,15 @@ INSERT OR IGNORE INTO user_library_permission (user_id, library_id) VALUES (?, ?
 -- name: RevokeLibraryAccess :exec
 DELETE FROM user_library_permission WHERE user_id = ? AND library_id = ?;
 
+-- name: GetLibraryMetadataSources :many
+SELECT provider, field_priority FROM library_metadata_source WHERE library_id = ?;
+
+-- name: SetLibraryMetadataSource :exec
+INSERT INTO library_metadata_source (library_id, provider, field_priority) VALUES (?, ?, ?)
+ON CONFLICT(library_id, provider) DO UPDATE SET field_priority = excluded.field_priority;
+
+-- name: DeleteLibraryMetadataSource :exec
+DELETE FROM library_metadata_source WHERE library_id = ? AND provider = ?;
+
 -- name: ClearUserLibraryPermissions :exec
 DELETE FROM user_library_permission WHERE user_id = ?;

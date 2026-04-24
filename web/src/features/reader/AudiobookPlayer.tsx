@@ -21,8 +21,10 @@ import {
   X,
   Volume2,
   VolumeX,
+  Bookmark,
 } from "lucide-solid";
 import { api, getAccessToken } from "../../shared/api/client";
+import { showToast } from "../../shared/ui/Toast";
 import { t } from "../../shared/i18n/i18n";
 import type { BookFile } from "../library/types";
 
@@ -47,6 +49,19 @@ interface AudioTrack {
   trackNumber?: number;
   trackTitle?: string;
   durationSecs?: number;
+}
+
+interface Annotation {
+  id: number;
+  bookId: number;
+  bookFileId: number | null;
+  type: string;
+  cfi: string | null;
+  pageNumber: number | null;
+  text: string | null;
+  note: string | null;
+  color: string;
+  createdAt: string;
 }
 
 // ---- Constants ----
@@ -154,6 +169,27 @@ async function saveSettings(
   }
 }
 
+async function fetchAnnotations(bookId: string): Promise<Annotation[]> {
+  try {
+    return await api<Annotation[]>(`/reader/books/${bookId}/annotations`);
+  } catch {
+    return [];
+  }
+}
+
+async function deleteAnnotationApi(
+  bookId: string,
+  annotationId: number,
+): Promise<void> {
+  try {
+    await api(`/reader/books/${bookId}/annotations/${annotationId}`, {
+      method: "DELETE",
+    });
+  } catch {
+    // Non-fatal.
+  }
+}
+
 // ---- AudiobookPlayer component ----
 
 const AudiobookPlayer: Component = () => {
@@ -191,6 +227,9 @@ const AudiobookPlayer: Component = () => {
   const [showSettings, setShowSettings] = createSignal(false);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
+
+  // Annotations.
+  const [annotations, setAnnotations] = createSignal<Annotation[]>([]);
 
   // Derived values.
   const currentTrack = createMemo(() => tracks()[currentTrackIndex()]);
@@ -343,6 +382,10 @@ const AudiobookPlayer: Component = () => {
       if (savedSettings.skipInterval != null)
         setSkipInterval(savedSettings.skipInterval);
     }
+
+    // Load annotations.
+    const existingAnnotations = await fetchAnnotations(params.id);
+    setAnnotations(existingAnnotations);
 
     // Load book metadata and files in parallel.
     try {
@@ -529,6 +572,43 @@ const AudiobookPlayer: Component = () => {
     return filename.replace(/\.[^.]+$/, "");
   });
 
+  function bookmarkAtTime(trackId: number, position: number): Annotation | undefined {
+    return annotations().find(
+      (a) =>
+        a.type === "BOOKMARK" &&
+        a.bookFileId === trackId &&
+        a.note?.includes(formatTime(position)),
+    );
+  }
+
+  async function handleToggleBookmark() {
+    const track = currentTrack();
+    if (!track) return;
+    const position = currentTime();
+    const formatted = formatTime(position);
+    const existing = bookmarkAtTime(track.id, position);
+    if (existing) {
+      await deleteAnnotationApi(params.id, existing.id);
+      setAnnotations((prev) => prev.filter((a) => a.id !== existing.id));
+      showToast(t("reader.bookmarkRemoved"), "info");
+    } else {
+      const annotation = await api<Annotation>(`/reader/books/${params.id}/annotations`, {
+        method: "POST",
+        body: JSON.stringify({
+          bookFileId: track.id,
+          type: "BOOKMARK",
+          text: "Bookmark",
+          note: `Bookmark at ${formatted}`,
+          color: "blue",
+        }),
+      });
+      if (annotation) {
+        setAnnotations((prev) => [annotation, ...prev]);
+        showToast(t("reader.bookmarkAdded"), "success");
+      }
+    }
+  }
+
   return (
     <div class="flex h-screen w-screen flex-col bg-slate-950 text-slate-100">
       {/* Hidden audio element */}
@@ -586,6 +666,13 @@ const AudiobookPlayer: Component = () => {
         </div>
 
         <div class="flex items-center gap-1">
+          <button
+            onClick={handleToggleBookmark}
+            class={`rounded-lg p-2 transition-colors ${bookmarkAtTime(currentTrack()?.id ?? 0, currentTime()) ? "text-indigo-400 hover:text-indigo-300" : "text-slate-300 hover:bg-white/10 hover:text-white"}`}
+            title={bookmarkAtTime(currentTrack()?.id ?? 0, currentTime()) ? t("reader.removeBookmark") : t("reader.addBookmark")}
+          >
+            <Bookmark class="h-4 w-4" />
+          </button>
           <button
             onClick={() => {
               setShowTrackList((v) => !v);

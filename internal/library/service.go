@@ -262,6 +262,49 @@ func (s *Service) ListPaths(ctx context.Context, libraryID int64) ([]LibraryPath
 	return paths, nil
 }
 
+// ListMetadataSources returns configured metadata sources for a library.
+func (s *Service) ListMetadataSources(ctx context.Context, libraryID int64) ([]GetLibraryMetadataSourcesRow, error) {
+	q := New(s.db)
+	rows, err := q.GetLibraryMetadataSources(ctx, libraryID)
+	if err != nil {
+		return nil, fmt.Errorf("list library metadata sources: %w", err)
+	}
+	return rows, nil
+}
+
+// SetMetadataSources replaces all metadata sources for a library.
+func (s *Service) SetMetadataSources(ctx context.Context, libraryID int64, sources []MetadataSourceResponse) error {
+	q := New(s.db)
+
+	existing, err := q.GetLibraryMetadataSources(ctx, libraryID)
+	if err != nil {
+		return fmt.Errorf("get existing metadata sources: %w", err)
+	}
+	for _, row := range existing {
+		if err := q.DeleteLibraryMetadataSource(ctx, DeleteLibraryMetadataSourceParams{
+			LibraryID: libraryID,
+			Provider:  row.Provider,
+		}); err != nil {
+			return fmt.Errorf("delete metadata source %q: %w", row.Provider, err)
+		}
+	}
+
+	for _, src := range sources {
+		if src.Provider == "" {
+			continue
+		}
+		if err := q.SetLibraryMetadataSource(ctx, SetLibraryMetadataSourceParams{
+			LibraryID:     libraryID,
+			Provider:      src.Provider,
+			FieldPriority: src.FieldPriority,
+		}); err != nil {
+			return fmt.Errorf("set metadata source %q: %w", src.Provider, err)
+		}
+	}
+
+	return nil
+}
+
 // nullString converts a *string to sql.NullString.
 func nullString(s *string) sql.NullString {
 	if s == nil {

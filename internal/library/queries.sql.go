@@ -79,6 +79,20 @@ func (q *Queries) DeleteLibrary(ctx context.Context, id int64) error {
 	return err
 }
 
+const deleteLibraryMetadataSource = `-- name: DeleteLibraryMetadataSource :exec
+DELETE FROM library_metadata_source WHERE library_id = ? AND provider = ?
+`
+
+type DeleteLibraryMetadataSourceParams struct {
+	LibraryID int64  `json:"library_id"`
+	Provider  string `json:"provider"`
+}
+
+func (q *Queries) DeleteLibraryMetadataSource(ctx context.Context, arg DeleteLibraryMetadataSourceParams) error {
+	_, err := q.db.ExecContext(ctx, deleteLibraryMetadataSource, arg.LibraryID, arg.Provider)
+	return err
+}
+
 const deleteLibraryPath = `-- name: DeleteLibraryPath :exec
 DELETE FROM library_path WHERE id = ?
 `
@@ -105,6 +119,38 @@ func (q *Queries) GetLibraryByID(ctx context.Context, id int64) (Library, error)
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const getLibraryMetadataSources = `-- name: GetLibraryMetadataSources :many
+SELECT provider, field_priority FROM library_metadata_source WHERE library_id = ?
+`
+
+type GetLibraryMetadataSourcesRow struct {
+	Provider      string `json:"provider"`
+	FieldPriority int64  `json:"field_priority"`
+}
+
+func (q *Queries) GetLibraryMetadataSources(ctx context.Context, libraryID int64) ([]GetLibraryMetadataSourcesRow, error) {
+	rows, err := q.db.QueryContext(ctx, getLibraryMetadataSources, libraryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetLibraryMetadataSourcesRow{}
+	for rows.Next() {
+		var i GetLibraryMetadataSourcesRow
+		if err := rows.Scan(&i.Provider, &i.FieldPriority); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getLibraryPathByID = `-- name: GetLibraryPathByID :one
@@ -205,6 +251,22 @@ type RevokeLibraryAccessParams struct {
 
 func (q *Queries) RevokeLibraryAccess(ctx context.Context, arg RevokeLibraryAccessParams) error {
 	_, err := q.db.ExecContext(ctx, revokeLibraryAccess, arg.UserID, arg.LibraryID)
+	return err
+}
+
+const setLibraryMetadataSource = `-- name: SetLibraryMetadataSource :exec
+INSERT INTO library_metadata_source (library_id, provider, field_priority) VALUES (?, ?, ?)
+ON CONFLICT(library_id, provider) DO UPDATE SET field_priority = excluded.field_priority
+`
+
+type SetLibraryMetadataSourceParams struct {
+	LibraryID     int64  `json:"library_id"`
+	Provider      string `json:"provider"`
+	FieldPriority int64  `json:"field_priority"`
+}
+
+func (q *Queries) SetLibraryMetadataSource(ctx context.Context, arg SetLibraryMetadataSourceParams) error {
+	_, err := q.db.ExecContext(ctx, setLibraryMetadataSource, arg.LibraryID, arg.Provider, arg.FieldPriority)
 	return err
 }
 

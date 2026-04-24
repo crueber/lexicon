@@ -22,8 +22,10 @@ import {
   Highlighter,
   MessageSquare,
   Trash2,
+  Bookmark,
 } from "lucide-solid";
 import { api, getAccessToken } from "../../shared/api/client";
+import { showToast } from "../../shared/ui/Toast";
 import { t } from "../../shared/i18n/i18n";
 
 // ---- Types ----
@@ -215,7 +217,7 @@ const PdfReader: Component = () => {
   const [showUI, setShowUI] = createSignal(true);
   const [showSettings, setShowSettings] = createSignal(false);
   const [showSidebar, setShowSidebar] = createSignal(false);
-  const [sidebarTab, setSidebarTab] = createSignal<"toc" | "thumbnails" | "annotations">("toc");
+  const [sidebarTab, setSidebarTab] = createSignal<"toc" | "thumbnails" | "annotations" | "search">("toc");
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
   const [rendering, setRendering] = createSignal(false);
@@ -237,6 +239,14 @@ const PdfReader: Component = () => {
   const [newNoteText, setNewNoteText] = createSignal("");
   const [newNoteColor, setNewNoteColor] = createSignal<AnnotationColor>("yellow");
 
+  // Search state.
+  const [searchQuery, setSearchQuery] = createSignal("");
+  const [searchMatches, setSearchMatches] = createSignal<
+    { pageIndex: number; textItemIndex: number; text: string; transform: number[]; width: number; height: number }[]
+  >([]);
+  const [currentMatchIndex, setCurrentMatchIndex] = createSignal(-1);
+  const [searching, setSearching] = createSignal(false);
+
   const pdfState: { pdf: any; renderTask: any } = {
     pdf: null,
     renderTask: null,
@@ -253,6 +263,16 @@ const PdfReader: Component = () => {
       }
     }, 3000);
   }
+
+  // Also re-draw search highlight when match index changes on same page.
+  createEffect(() => {
+    const idx = currentMatchIndex();
+    if (idx < 0 || !pdfState.pdf || loading()) return;
+    const match = searchMatches()[idx];
+    if (match && match.pageIndex === currentPage()) {
+      renderPage(currentPage(), zoom());
+    }
+  });
 
   const debouncedSaveProgress = debounce(
     (fileId: number, page: number) => {
@@ -279,6 +299,8 @@ const PdfReader: Component = () => {
       pdfState.renderTask = page.render(renderContext);
       await pdfState.renderTask.promise;
       pdfState.renderTask = null;
+      // Draw search highlight if current match is on this page.
+      drawSearchHighlight(ctx, scale, viewport.height);
     } catch (err: any) {
       if (err?.name !== "RenderingCancelledException") {
         console.error("PDF render error:", err);
@@ -423,6 +445,107 @@ const PdfReader: Component = () => {
     setAnnotations((prev) => prev.filter((a) => a.id !== annotation.id));
   }
 
+  function bookmarkAtPage(page: number): Annotation | undefined {
+    return annotations().find((a) => a.type === "BOOKMARK" && a.pageNumber === page);
+  }
+
+  async function handleToggleBookmark() {
+    const fileId = searchParams.fileId;
+    if (!fileId) return;
+    const page = currentPage();
+    const existing = bookmarkAtPage(page);
+    if (existing) {
+      await deleteAnnotationApi(params.id, existing.id);
+      setAnnotations((prev) => prev.filter((a) => a.id !== existing.id));
+      showToast(t("reader.bookmarkRemoved"), "info");
+    } else {
+      const annotation = await api<Annotation>(`/reader/books/${params.id}/annotations`, {
+        method: "POST",
+        body: JSON.stringify({
+          bookFileId: Number(fileId),
+          type: "BOOKMARK",
+          pageNumber: page,
+          text: "Bookmark",
+          note: "",
+          color: "blue",
+        }),
+      });
+      if (annotation) {
+        setAnnotations((prev) => [annotation, ...prev]);
+        showToast(t("reader.bookmarkAdded"), "success");
+      }
+    }
+  }
+
+  async function performSearch(query: string) {
+    if (!pdfState.pdf || !query.trim()) {
+      setSearchMatches([]);
+      setCurrentMatchIndex(-1);
+      return;
+    }
+    setSearching(true);
+    const total = pdfState.pdf.numPages as number;
+    const lowerQuery = query.toLowerCase();
+    const matches: { pageIndex: number; textItemIndex: number; text: string; transform: number[]; width: number; height: number }[] = [];
+
+    try {
+      for (let i = 1; i <= total; i++) {
+        const page = await pdfState.pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const items = textContent.items;
+        for (let j = 0; j < items.length; j++) {
+          const item = items[j];
+          const str = item.str as string;
+          if (str.toLowerCase().includes(lowerQuery)) {
+            matches.push({
+              pageIndex: i,
+              textItemIndex: j,
+              text: str,
+              transform: item.transform as number[],
+              width: (item as any).width ?? 0,
+              height: (item as any).height ?? 0,
+            });
+          }
+        }
+      }
+      setSearchMatches(matches);
+      if (matches.length > 0) {
+        setCurrentMatchIndex(0);
+        goToMatch(0);
+      } else {
+        setCurrentMatchIndex(-1);
+      }
+    } catch (err) {
+      console.error("Search error:", err);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function goToMatch(index: number) {
+    const matches = searchMatches();
+    if (index < 0 || index >= matches.length) return;
+    setCurrentMatchIndex(index);
+    const match = matches[index];
+    setCurrentPage(match.pageIndex);
+    setPageInput(String(match.pageIndex));
+  }
+
+  function drawSearchHighlight(ctx: CanvasRenderingContext2D, scale: number, viewportHeight: number) {
+    const match = searchMatches()[currentMatchIndex()];
+    if (!match || match.pageIndex !== currentPage()) return;
+
+    const x = match.transform[4] * scale;
+    const y = viewportHeight - match.transform[5] * scale;
+    const w = (match.width || match.text.length * 6) * scale;
+    const h = (match.height || 12) * scale;
+
+    ctx.save();
+    ctx.fillStyle = "rgba(250, 204, 21, 0.4)";
+    ctx.fillRect(x, y - h, w, h);
+    ctx.restore();
+  }
+
   function annotationsForPage(page: number): Annotation[] {
     return annotations().filter((a) => a.pageNumber === page);
   }
@@ -544,6 +667,9 @@ const PdfReader: Component = () => {
           setShowSettings(false);
           setShowSidebar(false);
           setShowAddNoteForm(false);
+          setSearchQuery("");
+          setSearchMatches([]);
+          setCurrentMatchIndex(-1);
         }
       }
 
@@ -641,6 +767,13 @@ const PdfReader: Component = () => {
         </div>
 
         <div class="flex items-center gap-1">
+          <button
+            onClick={handleToggleBookmark}
+            class={`rounded-lg p-2 transition-colors ${bookmarkAtPage(currentPage()) ? "text-indigo-400 hover:text-indigo-300" : "text-slate-300 hover:bg-white/10 hover:text-white"}`}
+            title={bookmarkAtPage(currentPage()) ? t("reader.removeBookmark") : t("reader.addBookmark")}
+          >
+            <Bookmark class="h-4 w-4" />
+          </button>
           <button
             onClick={zoomOut}
             class="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
@@ -815,6 +948,16 @@ const PdfReader: Component = () => {
             >
               {t("reader.annotations")}
             </button>
+            <button
+              onClick={() => setSidebarTab("search")}
+              class={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${
+                sidebarTab() === "search"
+                  ? "bg-indigo-600/30 text-indigo-300"
+                  : "text-slate-400 hover:bg-white/10 hover:text-slate-200"
+              }`}
+            >
+              {t("reader.search")}
+            </button>
           </div>
           <button
             onClick={() => setShowSidebar(false)}
@@ -939,6 +1082,87 @@ const PdfReader: Component = () => {
                     </div>
                   )}
                 </For>
+              </div>
+            </Show>
+          </div>
+        </Show>
+
+        <Show when={sidebarTab() === "search"}>
+          <div class="flex flex-1 flex-col overflow-hidden p-3">
+            <div class="flex flex-col gap-2">
+              <input
+                type="text"
+                value={searchQuery()}
+                onInput={(e) => setSearchQuery(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    performSearch(searchQuery());
+                  }
+                }}
+                placeholder={t("reader.searchPlaceholder")}
+                class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+              />
+              <div class="flex items-center gap-2">
+                <button
+                  onClick={() => performSearch(searchQuery())}
+                  disabled={searching()}
+                  class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+                >
+                  {searching() ? t("reader.searching") : t("reader.search")}
+                </button>
+                <Show when={searchMatches().length > 0}>
+                  <span class="text-xs text-slate-400">
+                    {searchMatches().length} {t("reader.matchesFound")}
+                  </span>
+                </Show>
+              </div>
+            </div>
+
+            <Show when={searchMatches().length > 0}>
+              <div class="mt-3 flex items-center justify-between">
+                <button
+                  onClick={() => {
+                    const idx = currentMatchIndex() - 1;
+                    if (idx >= 0) goToMatch(idx);
+                  }}
+                  disabled={currentMatchIndex() <= 0}
+                  class="rounded-lg px-3 py-1.5 text-xs text-slate-300 hover:bg-white/10 disabled:opacity-40 transition-colors"
+                >
+                  {t("reader.previousMatch")}
+                </button>
+                <span class="text-xs text-slate-400">
+                  {currentMatchIndex() + 1} / {searchMatches().length}
+                </span>
+                <button
+                  onClick={() => {
+                    const idx = currentMatchIndex() + 1;
+                    if (idx < searchMatches().length) goToMatch(idx);
+                  }}
+                  disabled={currentMatchIndex() >= searchMatches().length - 1}
+                  class="rounded-lg px-3 py-1.5 text-xs text-slate-300 hover:bg-white/10 disabled:opacity-40 transition-colors"
+                >
+                  {t("reader.nextMatch")}
+                </button>
+              </div>
+
+              <div class="mt-2 flex-1 overflow-y-auto">
+                <div class="flex flex-col gap-1">
+                  <For each={searchMatches()}>
+                    {(match, index) => (
+                      <button
+                        onClick={() => goToMatch(index())}
+                        class={`rounded-lg px-3 py-2 text-left text-xs transition-colors ${
+                          currentMatchIndex() === index()
+                            ? "bg-indigo-600/30 text-indigo-300"
+                            : "text-slate-400 hover:bg-white/10 hover:text-slate-200"
+                        }`}
+                      >
+                        <span class="font-medium">{t("reader.page")} {match.pageIndex}</span>
+                        <span class="ml-2 text-slate-500 line-clamp-1">{match.text}</span>
+                      </button>
+                    )}
+                  </For>
+                </div>
               </div>
             </Show>
           </div>
@@ -1119,6 +1343,7 @@ const PdfReader: Component = () => {
           onClick={() => {
             setShowSidebar(false);
             setShowSettings(false);
+            setShowAddNoteForm(false);
           }}
         />
       </Show>

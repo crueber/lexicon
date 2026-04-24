@@ -21,8 +21,10 @@ import {
   BookOpen,
   Highlighter,
   Trash2,
+  Bookmark,
 } from "lucide-solid";
 import { api, getAccessToken } from "../../shared/api/client";
+import { showToast } from "../../shared/ui/Toast";
 import { t } from "../../shared/i18n/i18n";
 
 // ---- Types ----
@@ -253,6 +255,7 @@ const EpubReader: Component = () => {
   const [toc, setToc] = createSignal<TocItem[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
+  const [currentCFI, setCurrentCFI] = createSignal("");
 
   // Annotation state.
   const [annotations, setAnnotations] = createSignal<Annotation[]>([]);
@@ -460,6 +463,7 @@ const EpubReader: Component = () => {
       epub.rendition.on("relocated", (location: any) => {
         const cfi = location?.start?.cfi;
         if (cfi) {
+          setCurrentCFI(cfi);
           debouncedSaveProgress(Number(fileId), cfi);
         }
 
@@ -663,6 +667,40 @@ const EpubReader: Component = () => {
     setAnnotations((prev) => prev.filter((a) => a.id !== annotation.id));
   }
 
+  function bookmarkAtCfi(cfi: string): Annotation | undefined {
+    return annotations().find((a) => a.type === "BOOKMARK" && a.cfi === cfi);
+  }
+
+  async function handleToggleBookmark() {
+    const fileId = searchParams.fileId;
+    if (!fileId) return;
+    const cfi = currentCFI();
+    if (!cfi) return;
+
+    const existing = bookmarkAtCfi(cfi);
+    if (existing) {
+      await deleteAnnotationApi(params.id, existing.id);
+      setAnnotations((prev) => prev.filter((a) => a.id !== existing.id));
+      showToast(t("reader.bookmarkRemoved"), "info");
+    } else {
+      const annotation = await api<Annotation>(`/reader/books/${params.id}/annotations`, {
+        method: "POST",
+        body: JSON.stringify({
+          bookFileId: Number(fileId),
+          type: "BOOKMARK",
+          cfi,
+          text: "Bookmark",
+          note: "",
+          color: "blue",
+        }),
+      });
+      if (annotation) {
+        setAnnotations((prev) => [annotation, ...prev]);
+        showToast(t("reader.bookmarkAdded"), "success");
+      }
+    }
+  }
+
   const currentTheme = () => themeStyles[settings().theme ?? "dark"];
 
   return (
@@ -727,6 +765,13 @@ const EpubReader: Component = () => {
           <Show when={progressPct() > 0}>
             <span class="mr-2 text-xs text-slate-400">{progressPct()}%</span>
           </Show>
+          <button
+            onClick={handleToggleBookmark}
+            class={`rounded-lg p-2 transition-colors ${bookmarkAtCfi(currentCFI()) ? "text-indigo-400 hover:text-indigo-300" : "text-slate-300 hover:bg-white/10 hover:text-white"}`}
+            title={bookmarkAtCfi(currentCFI()) ? t("reader.removeBookmark") : t("reader.addBookmark")}
+          >
+            <Bookmark class="h-4 w-4" />
+          </button>
           <button
             onClick={() => {
               setShowAnnotations((v) => !v);

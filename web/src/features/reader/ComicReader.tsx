@@ -15,8 +15,10 @@ import {
   Settings,
   X,
   BookOpen,
+  Bookmark,
 } from "lucide-solid";
 import { api, getAccessToken } from "../../shared/api/client";
+import { showToast } from "../../shared/ui/Toast";
 import { t } from "../../shared/i18n/i18n";
 
 // ---- Types ----
@@ -36,6 +38,19 @@ interface ReadingProgress {
   fileId: number;
   progress: string;
   progressType: string;
+}
+
+interface Annotation {
+  id: number;
+  bookId: number;
+  bookFileId: number | null;
+  type: string;
+  cfi: string | null;
+  pageNumber: number | null;
+  text: string | null;
+  note: string | null;
+  color: string;
+  createdAt: string;
 }
 
 // ---- Default settings ----
@@ -106,6 +121,27 @@ async function saveSettings(
   }
 }
 
+async function fetchAnnotations(bookId: string): Promise<Annotation[]> {
+  try {
+    return await api<Annotation[]>(`/reader/books/${bookId}/annotations`);
+  } catch {
+    return [];
+  }
+}
+
+async function deleteAnnotationApi(
+  bookId: string,
+  annotationId: number,
+): Promise<void> {
+  try {
+    await api(`/reader/books/${bookId}/annotations/${annotationId}`, {
+      method: "DELETE",
+    });
+  } catch {
+    // Non-fatal.
+  }
+}
+
 // ---- Debounce helper ----
 
 function debounce<T extends (...args: Parameters<T>) => void>(
@@ -169,6 +205,9 @@ const ComicReader: Component = () => {
   // Settings.
   const [settings, setSettings] =
     createSignal<ComicReaderSettings>(defaultSettings);
+
+  // Annotations.
+  const [annotations, setAnnotations] = createSignal<Annotation[]>([]);
 
   // Auto-hide UI after 3 seconds of inactivity.
   let hideTimer: ReturnType<typeof setTimeout> | undefined;
@@ -298,6 +337,39 @@ const ComicReader: Component = () => {
     }
   }
 
+  function bookmarkAtPage(page: number): Annotation | undefined {
+    return annotations().find((a) => a.type === "BOOKMARK" && a.pageNumber === page);
+  }
+
+  async function handleToggleBookmark() {
+    const rawFileId = searchParams.fileId;
+    const fileId = Array.isArray(rawFileId) ? rawFileId[0] : rawFileId;
+    if (!fileId) return;
+    const page = currentPage() + 1; // annotations use 1-based page numbers
+    const existing = bookmarkAtPage(page);
+    if (existing) {
+      await deleteAnnotationApi(params.id, existing.id);
+      setAnnotations((prev) => prev.filter((a) => a.id !== existing.id));
+      showToast(t("reader.bookmarkRemoved"), "info");
+    } else {
+      const annotation = await api<Annotation>(`/reader/books/${params.id}/annotations`, {
+        method: "POST",
+        body: JSON.stringify({
+          bookFileId: Number(fileId),
+          type: "BOOKMARK",
+          pageNumber: page,
+          text: "Bookmark",
+          note: "",
+          color: "blue",
+        }),
+      });
+      if (annotation) {
+        setAnnotations((prev) => [annotation, ...prev]);
+        showToast(t("reader.bookmarkAdded"), "success");
+      }
+    }
+  }
+
   // Image fit style based on settings.
   const imageFitStyle = () => {
     const fit = settings().fitMode ?? "width";
@@ -336,6 +408,10 @@ const ComicReader: Component = () => {
       ...(savedSettings ?? {}),
     };
     setSettings(mergedSettings);
+
+    // Load annotations.
+    const existingAnnotations = await fetchAnnotations(params.id);
+    setAnnotations(existingAnnotations);
 
     // Fetch page list.
     let pageList: ComicPageInfo[];
@@ -464,6 +540,13 @@ const ComicReader: Component = () => {
         </div>
 
         <div class="flex items-center gap-1">
+          <button
+            onClick={handleToggleBookmark}
+            class={`rounded-lg p-2 transition-colors ${bookmarkAtPage(currentPage() + 1) ? "text-indigo-400 hover:text-indigo-300" : "text-slate-300 hover:bg-white/10 hover:text-white"}`}
+            title={bookmarkAtPage(currentPage() + 1) ? t("reader.removeBookmark") : t("reader.addBookmark")}
+          >
+            <Bookmark class="h-4 w-4" />
+          </button>
           <button
             onClick={() => setShowSettings((v) => !v)}
             class="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white transition-colors"

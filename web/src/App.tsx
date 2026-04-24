@@ -16,6 +16,7 @@ import {
   Inbox,
   List,
   Mail,
+  SlidersHorizontal,
 } from "lucide-solid";
 import { t } from "./shared/i18n/i18n";
 import AuthProvider, { useAuth } from "./features/auth/AuthProvider";
@@ -43,6 +44,8 @@ import MagicShelfDetail from "./features/shelf/MagicShelfDetail";
 import UserManagement from "./features/admin/UserManagement";
 import AuditLogs from "./features/admin/AuditLogs";
 import AdminSettings from "./features/admin/AdminSettings";
+import ProviderPrioritySettings from "./features/admin/ProviderPrioritySettings";
+import LibraryMetadataSources from "./features/admin/LibraryMetadataSources";
 import TaskMonitor from "./features/admin/TaskMonitor";
 import EmailSettings from "./features/admin/EmailSettings";
 import Notebook from "./features/notebook/Notebook";
@@ -112,6 +115,8 @@ const Sidebar: Component = () => {
           <NavItem href="/admin/users" icon={Users} label={t("common.users")} />
           <NavItem href="/admin/audit-logs" icon={ClipboardList} label={t("common.auditLogs")} />
           <NavItem href="/admin/settings" icon={Settings} label={t("common.settings")} />
+          <NavItem href="/admin/provider-priorities" icon={SlidersHorizontal} label={t("common.providerPriorities")} />
+          <NavItem href="/admin/library-sources" icon={Library} label={t("common.librarySources")} />
           <NavItem href="/admin/email" icon={Mail} label={t("common.email")} />
           <NavItem href="/tasks" icon={List} label={t("common.tasks")} />
         </Show>
@@ -190,6 +195,8 @@ const MobileNav: Component = () => {
               <NavItem href="/admin/users" icon={Users} label={t("common.users")} onClick={() => setMenuOpen(false)} />
               <NavItem href="/admin/audit-logs" icon={ClipboardList} label={t("common.auditLogs")} onClick={() => setMenuOpen(false)} />
               <NavItem href="/admin/settings" icon={Settings} label={t("common.settings")} onClick={() => setMenuOpen(false)} />
+              <NavItem href="/admin/provider-priorities" icon={SlidersHorizontal} label={t("common.providerPriorities")} onClick={() => setMenuOpen(false)} />
+              <NavItem href="/admin/library-sources" icon={Library} label={t("common.librarySources")} onClick={() => setMenuOpen(false)} />
               <NavItem href="/admin/email" icon={Mail} label={t("common.email")} onClick={() => setMenuOpen(false)} />
               <NavItem href="/tasks" icon={List} label={t("common.tasks")} onClick={() => setMenuOpen(false)} />
               <div class="my-2 border-t border-slate-800" />
@@ -304,6 +311,8 @@ const App: Component = () => {
         <Route path="/admin/users" component={UserManagement} />
         <Route path="/admin/audit-logs" component={AuditLogs} />
         <Route path="/admin/settings" component={AdminSettings} />
+        <Route path="/admin/provider-priorities" component={ProviderPrioritySettings} />
+        <Route path="/admin/library-sources" component={LibraryMetadataSources} />
         <Route path="/admin/email" component={EmailSettings} />
       </Route>
     </Router>

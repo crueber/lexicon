@@ -167,13 +167,19 @@ func (h *Handler) HandleSetProviderPriority(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// handleSearch handles GET /api/metadata/search?title={}&author={}&isbn={}&bookType={}.
+// handleSearch handles GET /api/metadata/search?title={}&author={}&isbn={}&bookType={}&libraryId={}.
 func (h *Handler) handleSearch(w http.ResponseWriter, r *http.Request) {
 	query := Query{
 		Title:    r.URL.Query().Get("title"),
 		Author:   r.URL.Query().Get("author"),
 		ISBN:     r.URL.Query().Get("isbn"),
 		BookType: r.URL.Query().Get("bookType"),
+	}
+
+	if libraryIDStr := r.URL.Query().Get("libraryId"); libraryIDStr != "" {
+		if libraryID, err := strconv.ParseInt(libraryIDStr, 10, 64); err == nil {
+			query.LibraryID = libraryID
+		}
 	}
 
 	if query.Title == "" && query.Author == "" && query.ISBN == "" {

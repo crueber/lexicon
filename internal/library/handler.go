@@ -72,6 +72,12 @@ func (h *Handler) Routes(r chi.Router) {
 			r.With(auth.RequireAdmin()).Post("/", h.handleAddPath)
 			r.With(auth.RequireAdmin()).Delete("/{pathId}", h.handleRemovePath)
 		})
+
+		// Admin-only: metadata sources.
+		r.With(auth.RequireAdmin()).Route("/metadata-sources", func(r chi.Router) {
+			r.Get("/", h.handleListMetadataSources)
+			r.Put("/", h.handleSetMetadataSources)
+		})
 	})
 }
 
@@ -117,6 +123,17 @@ type UpdateLibraryRequest struct {
 // AddPathRequest is the JSON body for POST /api/libraries/{id}/paths.
 type AddPathRequest struct {
 	Path string `json:"path"`
+}
+
+// MetadataSourceResponse is the JSON representation of a library metadata source.
+type MetadataSourceResponse struct {
+	Provider       string `json:"provider"`
+	FieldPriority  int64  `json:"fieldPriority"`
+}
+
+// SetMetadataSourcesRequest is the JSON body for PUT /api/libraries/{id}/metadata-sources.
+type SetMetadataSourcesRequest struct {
+	Sources []MetadataSourceResponse `json:"sources"`
 }
 
 // --- Handlers ---
@@ -458,6 +475,53 @@ func (h *Handler) handleScan(w http.ResponseWriter, r *http.Request) {
 		FilesUpdated: result.FilesUpdated,
 		ErrorCount:   len(result.Errors),
 	})
+}
+
+// handleListMetadataSources handles GET /api/libraries/{id}/metadata-sources.
+func (h *Handler) handleListMetadataSources(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(w, r, "id")
+	if !ok {
+		return
+	}
+
+	rows, err := h.svc.ListMetadataSources(r.Context(), id)
+	if err != nil {
+		h.logger.Error("list library metadata sources", "library_id", id, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	resp := make([]MetadataSourceResponse, len(rows))
+	for i, row := range rows {
+		resp[i] = MetadataSourceResponse{
+			Provider:      row.Provider,
+			FieldPriority: row.FieldPriority,
+		}
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleSetMetadataSources handles PUT /api/libraries/{id}/metadata-sources.
+func (h *Handler) handleSetMetadataSources(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(w, r, "id")
+	if !ok {
+		return
+	}
+
+	var req SetMetadataSourcesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := h.svc.SetMetadataSources(r.Context(), id, req.Sources); err != nil {
+		h.logger.Error("set metadata sources", "library_id", id, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, req.Sources)
 }
 
 // handleListPaths handles GET /api/libraries/{id}/paths.

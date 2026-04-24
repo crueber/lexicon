@@ -10,6 +10,7 @@ import (
 	"sort"
 
 	"github.com/crueber/lexicon/internal/book"
+	"github.com/crueber/lexicon/internal/library"
 )
 
 // ErrProposalNotFound is returned when a proposal does not exist.
@@ -54,10 +55,30 @@ func (s *Service) RegisterProvider(p Provider) {
 	s.providers[p.Name()] = p
 }
 
-// Search searches all registered providers for a book.
+// Search searches registered providers for a book.
+// If query.LibraryID is set, only providers configured for that library are searched.
 func (s *Service) Search(ctx context.Context, query Query) (map[string][]Result, error) {
 	results := make(map[string][]Result)
-	for name, p := range s.providers {
+
+	providersToSearch := s.providers
+	if query.LibraryID > 0 {
+		lq := library.New(s.db)
+		sources, err := lq.GetLibraryMetadataSources(ctx, query.LibraryID)
+		if err != nil {
+			s.logger.Warn("get library metadata sources failed", "library_id", query.LibraryID, "error", err)
+			// Non-fatal: fall back to searching all providers.
+		} else if len(sources) > 0 {
+			filtered := make(map[string]Provider, len(sources))
+			for _, src := range sources {
+				if p, ok := s.providers[src.Provider]; ok {
+					filtered[src.Provider] = p
+				}
+			}
+			providersToSearch = filtered
+		}
+	}
+
+	for name, p := range providersToSearch {
 		providerResults, err := p.Search(ctx, query)
 		if err != nil {
 			s.logger.Warn("provider search failed",

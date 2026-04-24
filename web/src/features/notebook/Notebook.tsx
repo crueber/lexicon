@@ -9,7 +9,7 @@ import {
   ErrorBoundary,
 } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { BookOpen, Trash2, Search, Filter, Download } from "lucide-solid";
+import { BookOpen, Trash2, Search, Filter, Download, Bookmark } from "lucide-solid";
 import { api, getAccessToken } from "../../shared/api/client";
 import { t } from "../../shared/i18n/i18n";
 
@@ -100,6 +100,7 @@ const Notebook: Component = () => {
   const [search, setSearch] = createSignal("");
   const [filterColor, setFilterColor] = createSignal<string | null>(null);
   const [filterBookId, setFilterBookId] = createSignal<number | null>(null);
+  const [filterType, setFilterType] = createSignal<string | null>(null);
 
   const [data, { refetch }] = createResource(page, fetchNotebook);
 
@@ -115,16 +116,18 @@ const Notebook: Component = () => {
     return Array.from(seen.entries()).map(([id, title]) => ({ id, title }));
   });
 
-  // Filter annotations client-side by search text, color, and book.
+  // Filter annotations client-side by search text, color, type, and book.
   const filtered = createMemo(() => {
     const annotations = data()?.annotations ?? [];
     const q = search().toLowerCase();
     const color = filterColor();
     const bookId = filterBookId();
+    const type = filterType();
 
     return annotations.filter((a) => {
       if (color && a.color !== color) return false;
       if (bookId !== null && a.bookId !== bookId) return false;
+      if (type && a.type !== type) return false;
       if (q) {
         const inText = a.text?.toLowerCase().includes(q) ?? false;
         const inNote = a.note?.toLowerCase().includes(q) ?? false;
@@ -194,21 +197,51 @@ const Notebook: Component = () => {
           />
         </div>
 
-        {/* Color filter */}
+        {/* Type filter */}
         <div class="flex items-center gap-1">
-          <Filter class="h-4 w-4 text-slate-500" />
-          <For each={["yellow", "green", "blue", "pink", "purple"]}>
-            {(color) => (
-              <button
-                onClick={() => setFilterColor(filterColor() === color ? null : color)}
-                class={`h-5 w-5 rounded-full transition-all ${colorDotClass(color)} ${
-                  filterColor() === color ? "ring-2 ring-white ring-offset-1 ring-offset-slate-900" : "opacity-60 hover:opacity-100"
-                }`}
-                title={color}
-              />
-            )}
-          </For>
+          <button
+            onClick={() => setFilterType(null)}
+            class={`rounded-lg px-2 py-1 text-xs font-medium transition-colors ${filterType() === null ? "bg-indigo-600/30 text-indigo-300" : "text-slate-400 hover:bg-white/10 hover:text-slate-200"}`}
+          >
+            {t("notebook.all")}
+          </button>
+          <button
+            onClick={() => setFilterType("HIGHLIGHT")}
+            class={`rounded-lg px-2 py-1 text-xs font-medium transition-colors ${filterType() === "HIGHLIGHT" ? "bg-indigo-600/30 text-indigo-300" : "text-slate-400 hover:bg-white/10 hover:text-slate-200"}`}
+          >
+            {t("notebook.highlights")}
+          </button>
+          <button
+            onClick={() => setFilterType("NOTE")}
+            class={`rounded-lg px-2 py-1 text-xs font-medium transition-colors ${filterType() === "NOTE" ? "bg-indigo-600/30 text-indigo-300" : "text-slate-400 hover:bg-white/10 hover:text-slate-200"}`}
+          >
+            {t("notebook.notes")}
+          </button>
+          <button
+            onClick={() => setFilterType("BOOKMARK")}
+            class={`rounded-lg px-2 py-1 text-xs font-medium transition-colors ${filterType() === "BOOKMARK" ? "bg-indigo-600/30 text-indigo-300" : "text-slate-400 hover:bg-white/10 hover:text-slate-200"}`}
+          >
+            {t("notebook.bookmarks")}
+          </button>
         </div>
+
+        {/* Color filter */}
+        <Show when={filterType() !== "BOOKMARK"}>
+          <div class="flex items-center gap-1">
+            <Filter class="h-4 w-4 text-slate-500" />
+            <For each={["yellow", "green", "blue", "pink", "purple"]}>
+              {(color) => (
+                <button
+                  onClick={() => setFilterColor(filterColor() === color ? null : color)}
+                  class={`h-5 w-5 rounded-full transition-all ${colorDotClass(color)} ${
+                    filterColor() === color ? "ring-2 ring-white ring-offset-1 ring-offset-slate-900" : "opacity-60 hover:opacity-100"
+                  }`}
+                  title={color}
+                />
+              )}
+            </For>
+          </div>
+        </Show>
 
         {/* Book filter */}
         <Show when={books().length > 0}>
@@ -303,22 +336,38 @@ const Notebook: Component = () => {
                         <For each={group.annotations}>
                           {(annotation) => (
                             <div
-                              class={`rounded-lg border p-3 ${colorClass(annotation.color)}`}
+                              class={`rounded-lg border p-3 ${annotation.type === "BOOKMARK" ? "border-indigo-400/40 bg-indigo-400/10" : colorClass(annotation.color)}`}
                             >
                               <div class="flex items-start justify-between gap-2">
                                 <div class="flex-1 min-w-0">
-                                  <Show when={annotation.text}>
+                                  <div class="flex items-center gap-2">
+                                    <Show when={annotation.type === "BOOKMARK"}>
+                                      <Bookmark class="h-3.5 w-3.5 text-indigo-400" />
+                                    </Show>
+                                    <Show when={annotation.type === "BOOKMARK" && annotation.note}>
+                                      <p class="text-xs font-medium text-indigo-300">
+                                        {annotation.note}
+                                      </p>
+                                    </Show>
+                                  </div>
+                                  <Show when={annotation.text && annotation.type !== "BOOKMARK"}>
                                     <p class="text-sm leading-relaxed">
                                       "{annotation.text}"
                                     </p>
                                   </Show>
-                                  <Show when={annotation.note}>
+                                  <Show when={annotation.note && annotation.type !== "BOOKMARK"}>
                                     <p class="mt-1 text-xs text-slate-400 italic">
                                       {annotation.note}
                                     </p>
                                   </Show>
                                   <p class="mt-1 text-xs text-slate-500">
                                     {formatDate(annotation.createdAt)}
+                                    <Show when={annotation.pageNumber}>
+                                      {" "}· {t("common.page")} {annotation.pageNumber}
+                                    </Show>
+                                    <Show when={annotation.cfi && !annotation.pageNumber}>
+                                      {" "}· CFI
+                                    </Show>
                                   </p>
                                 </div>
                                 <button

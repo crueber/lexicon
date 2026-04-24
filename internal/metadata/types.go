@@ -11,10 +11,11 @@ type Provider interface {
 
 // Query holds search parameters.
 type Query struct {
-	Title    string
-	Author   string
-	ISBN     string
-	BookType string // EBOOK, AUDIOBOOK, COMIC
+	Title     string
+	Author    string
+	ISBN      string
+	BookType  string // EBOOK, AUDIOBOOK, COMIC
+	LibraryID int64  // optional: filter providers by library metadata sources
 }
 
 // Result holds metadata from a provider.
