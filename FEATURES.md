@@ -80,6 +80,8 @@ A comprehensive feature list for Lexicon, a self-hosted digital library manager.
 - **Per-library provider configuration** — Each library can be configured with which metadata providers to use.
 - **Rate limiting** — Metadata provider requests are rate-limited to respect external APIs.
 - **Cover extraction from providers** — Fetched metadata can include cover images downloaded from provider URLs.
+- **Per-field priority matrix** — Merges proposals from multiple providers field-by-field using configurable provider priorities.
+- **Provider priority configuration** — Admins can set priority scores (1-10) for each metadata provider.
 
 ---
 
@@ -222,6 +224,10 @@ A comprehensive feature list for Lexicon, a self-hosted digital library manager.
 - **Book added events** — Notification when a new book is discovered during scanning.
 - **Session revocation events** — Pushes token revocation to connected clients for immediate logout.
 - **Client ping / server pong** — Keeps connections alive with heartbeat messages.
+- **Book updated events** — Notification when book metadata or cover is changed.
+- **Book deleted events** — Notification when a book is removed from the library.
+- **Metadata proposal ready events** — Notification when a new metadata proposal is available for review.
+- **General notification events** — Ad-hoc toast notifications for task completion and scan results.
 - **Auto-reconnect with backoff** — Frontend automatically reconnects with exponential backoff on disconnect.
 
 ---
