@@ -68,13 +68,9 @@ func TokenQueryParamMiddleware(next http.Handler) http.Handler {
 
 // Routes registers all reader routes on the given router.
 // RequireAuth must already be applied by the caller.
+// TokenQueryParamMiddleware should be applied by the caller before Routes.
 func (h *Handler) Routes(r chi.Router) {
-	// Apply token query param middleware so <audio src="...?token=..."> works.
-	r.Use(TokenQueryParamMiddleware)
-
-	r.Get("/books/{bookId}/files/{fileId}/stream", h.handleStream)
 	r.Get("/books/{bookId}/files/{fileId}/pages", h.handleListComicPages)
-	r.Get("/books/{bookId}/files/{fileId}/pages/{pageIndex}", h.handleGetComicPage)
 	r.Get("/books/{bookId}/progress", h.handleGetProgress)
 	r.Put("/books/{bookId}/progress", h.handlePutProgress)
 	r.Get("/books/{bookId}/settings", h.handleGetSettings)
@@ -125,9 +121,9 @@ func hasLibraryAccess(principal *auth.Principal, libraryID int64) bool {
 	return false
 }
 
-// handleStream handles GET /api/reader/books/{bookId}/files/{fileId}/stream.
+// HandleStream handles GET /api/reader/books/{bookId}/files/{fileId}/stream.
 // It streams the book file with Range request support.
-func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleStream(w http.ResponseWriter, r *http.Request) {
 	principal := auth.PrincipalFromContext(r.Context())
 	if principal == nil {
 		writeError(w, http.StatusUnauthorized, "authentication required")
@@ -514,9 +510,9 @@ func (h *Handler) handleListComicPages(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, pages)
 }
 
-// handleGetComicPage handles GET /api/reader/books/{bookId}/files/{fileId}/pages/{pageIndex}.
+// HandleGetComicPage handles GET /api/reader/books/{bookId}/files/{fileId}/pages/{pageIndex}.
 // Returns the image bytes for a specific page.
-func (h *Handler) handleGetComicPage(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleGetComicPage(w http.ResponseWriter, r *http.Request) {
 	principal := auth.PrincipalFromContext(r.Context())
 	if principal == nil {
 		writeError(w, http.StatusUnauthorized, "authentication required")

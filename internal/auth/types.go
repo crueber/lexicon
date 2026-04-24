@@ -1,5 +1,14 @@
 package auth
 
+// Permission constants for use with RequirePermission.
+const (
+	PermDownload     = "download"
+	PermUpload       = "upload"
+	PermEmailSend    = "email_send"
+	PermEditMetadata = "edit_metadata"
+	PermOPDS         = "opds"
+)
+
 // Principal represents an authenticated user in request context.
 type Principal struct {
 	UserID      int64

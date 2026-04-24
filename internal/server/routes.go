@@ -9,6 +9,7 @@ import (
 	"net/url"
 
 	"github.com/crueber/lexicon/internal/auth"
+	"github.com/crueber/lexicon/internal/reader"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -151,6 +152,16 @@ func (s *Server) setupRoutes() {
 		// Reader routes (require auth).
 		r.Route("/reader", func(r chi.Router) {
 			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
+			// Apply token query param middleware so <audio src="...?token=..."> works.
+			r.Use(reader.TokenQueryParamMiddleware)
+
+			// File-serving endpoints require download permission.
+			r.Route("/books/{bookId}/files/{fileId}", func(r chi.Router) {
+				r.Use(auth.RequirePermission(auth.PermDownload))
+				r.Get("/stream", s.readerHandler.HandleStream)
+				r.Get("/pages/{pageIndex}", s.readerHandler.HandleGetComicPage)
+			})
+
 			s.readerHandler.Routes(r)
 			// Annotation endpoints live under /api/reader/books/{bookId}/annotations.
 			s.notebookHandler.ReaderRoutes(r)
