@@ -8,7 +8,7 @@ import {
   Suspense,
   ErrorBoundary,
 } from "solid-js";
-import { useParams, useNavigate } from "@solidjs/router";
+import { useParams, useNavigate, A } from "@solidjs/router";
 import {
   BookOpen,
   Headphones,
@@ -275,17 +275,6 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
     });
   });
 
-  const seriesLabel = createMemo(() => {
-    const series = book()?.series ?? [];
-    if (series.length === 0) return null;
-    return series
-      .map((s) =>
-        s.seriesNumber !== undefined
-          ? `Book ${s.seriesNumber} of ${s.name}`
-          : s.name,
-      )
-      .join(", ");
-  });
 
   async function handleDelete() {
     setDeleting(true);
@@ -435,7 +424,12 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
                   <For each={b().authors}>
                     {(author, i) => (
                       <>
-                        <span>{author.name}</span>
+                        <A
+                          href={`/authors/${author.id}`}
+                          class="hover:text-indigo-400 hover:underline"
+                        >
+                          {author.name}
+                        </A>
                         <Show when={i() < b().authors.length - 1}>
                           <span class="text-slate-600">,</span>
                         </Show>
@@ -446,10 +440,29 @@ const BookDetailInner: Component<{ bookId: number }> = (props) => {
               </Show>
 
               {/* Series */}
-              <Show when={seriesLabel()}>
-                <p class="text-sm font-medium text-indigo-400">
-                  {seriesLabel()}
-                </p>
+              <Show when={(b().series ?? []).length > 0}>
+                <div class="flex flex-wrap gap-1 text-sm font-medium text-indigo-400">
+                  <For each={b().series}>
+                    {(series, i) => (
+                      <>
+                        <A
+                          href={`/series/${series.id}`}
+                          class="hover:text-indigo-300 hover:underline"
+                        >
+                          <Show
+                            when={series.seriesNumber !== undefined}
+                            fallback={series.name}
+                          >
+                            {`Book ${series.seriesNumber} of ${series.name}`}
+                          </Show>
+                        </A>
+                        <Show when={i() < b().series.length - 1}>
+                          <span class="text-indigo-600">,</span>
+                        </Show>
+                      </>
+                    )}
+                  </For>
+                </div>
               </Show>
 
               {/* Description */}
