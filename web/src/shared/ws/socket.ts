@@ -131,6 +131,11 @@ export function createWebSocketClient(getToken: () => string | null): WSClient {
         return;
       }
 
+      // Handle BOOK_UPDATED by dispatching a custom event for cache invalidation.
+      if (msg.type === "BOOK_UPDATED") {
+        window.dispatchEvent(new CustomEvent("book-updated", { detail: msg.payload }));
+      }
+
       dispatch(msg);
     };
 

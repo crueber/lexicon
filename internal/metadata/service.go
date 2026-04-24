@@ -14,11 +14,15 @@ import (
 // ErrProposalNotFound is returned when a proposal does not exist.
 var ErrProposalNotFound = errors.New("proposal not found")
 
+// BroadcastBookUpdatedFunc broadcasts a BOOK_UPDATED WebSocket event.
+type BroadcastBookUpdatedFunc func(bookID int64)
+
 // Service orchestrates metadata providers and manages proposals.
 type Service struct {
-	db        *sql.DB
-	providers map[string]Provider
-	logger    *slog.Logger
+	db                     *sql.DB
+	providers              map[string]Provider
+	logger                 *slog.Logger
+	broadcastBookUpdated   BroadcastBookUpdatedFunc
 }
 
 // NewService creates a new metadata Service.
@@ -28,6 +32,11 @@ func NewService(db *sql.DB, logger *slog.Logger) *Service {
 		providers: make(map[string]Provider),
 		logger:    logger,
 	}
+}
+
+// WithBroadcastBookUpdatedFunc sets the broadcast function for book updates.
+func (s *Service) WithBroadcastBookUpdatedFunc(fn BroadcastBookUpdatedFunc) {
+	s.broadcastBookUpdated = fn
 }
 
 // RegisterProvider adds a provider to the registry.
@@ -216,6 +225,10 @@ func (s *Service) AcceptProposal(ctx context.Context, proposalID int64) error {
 		"book_id", proposal.BookID,
 		"provider", proposal.Provider,
 	)
+
+	if s.broadcastBookUpdated != nil {
+		s.broadcastBookUpdated(proposal.BookID)
+	}
 
 	return nil
 }

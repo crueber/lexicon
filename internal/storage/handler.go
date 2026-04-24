@@ -21,11 +21,12 @@ import (
 
 // Handler serves cover images for books.
 type Handler struct {
-	db       *sql.DB
-	dataDir  string
-	logger   *slog.Logger
-	fontSvc  *FontService
-	auditSvc *audit.Service
+	db                   *sql.DB
+	dataDir              string
+	logger               *slog.Logger
+	fontSvc              *FontService
+	auditSvc             *audit.Service
+	broadcastBookUpdated func(bookID int64)
 }
 
 // NewHandler creates a new storage Handler.
@@ -42,6 +43,11 @@ func NewHandler(db *sql.DB, dataDir string, logger *slog.Logger) *Handler {
 // WithAuditService sets the audit service for logging storage events.
 func (h *Handler) WithAuditService(svc *audit.Service) {
 	h.auditSvc = svc
+}
+
+// WithBroadcastBookUpdatedFunc sets the broadcast function for book updates.
+func (h *Handler) WithBroadcastBookUpdatedFunc(fn func(bookID int64)) {
+	h.broadcastBookUpdated = fn
 }
 
 // Routes registers cover serving routes.
@@ -194,6 +200,10 @@ func (h *Handler) HandleUploadCover(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	if h.broadcastBookUpdated != nil {
+		h.broadcastBookUpdated(bookID)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]string{"coverPath": coverPath})
 }
 
@@ -252,6 +262,10 @@ func (h *Handler) HandleDeleteCover(w http.ResponseWriter, r *http.Request) {
 			ResourceID:   &bookID,
 			IPAddress:    ip,
 		})
+	}
+
+	if h.broadcastBookUpdated != nil {
+		h.broadcastBookUpdated(bookID)
 	}
 
 	w.WriteHeader(http.StatusNoContent)

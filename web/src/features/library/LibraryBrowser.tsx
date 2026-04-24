@@ -199,9 +199,16 @@ const LibraryBrowserInner: Component<{ libraryId: number }> = (props) => {
     }
   });
 
+  // Listen for book-updated custom events (from WebSocket BOOK_UPDATED) to refetch.
+  const handleBookUpdated = () => {
+    void refetchBooks();
+  };
+  window.addEventListener("book-updated", handleBookUpdated);
+
   onCleanup(() => {
     unsubScanComplete();
     unsubBookAdded();
+    window.removeEventListener("book-updated", handleBookUpdated);
   });
 
   const totalPages = createMemo(() => {

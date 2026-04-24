@@ -198,6 +198,9 @@ func New(cfg Config) (*Server, error) {
 
 	// Set up the metadata service and register providers.
 	metadataSvc := metadata.NewService(db, logger)
+	metadataSvc.WithBroadcastBookUpdatedFunc(func(bookID int64) {
+		hub.BroadcastBookUpdated(bookID)
+	})
 	metadataSvc.RegisterProvider(metadata.NewGoogleBooksProvider(cfg.GoogleBooksAPIKey, logger))
 	metadataSvc.RegisterProvider(metadata.NewOpenLibraryProvider(logger))
 	metadataSvc.RegisterProvider(metadata.NewHardcoverProvider(cfg.HardcoverAPIKey, logger))
@@ -255,6 +258,9 @@ func New(cfg Config) (*Server, error) {
 
 	storageHdlr := storage.NewHandler(db, cfg.DataDir, logger)
 	storageHdlr.WithAuditService(auditSvc)
+	storageHdlr.WithBroadcastBookUpdatedFunc(func(bookID int64) {
+		hub.BroadcastBookUpdated(bookID)
+	})
 
 	appsettingsSvc := appsettings.NewService(db, logger)
 	appsettingsHdlr := appsettings.NewHandler(appsettingsSvc, logger)

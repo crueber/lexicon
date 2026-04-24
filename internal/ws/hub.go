@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"fmt"
 	"log/slog"
 	"sync"
 
@@ -113,4 +114,9 @@ func (h *Hub) BroadcastToAll(msg Message) {
 			)
 		}
 	}
+}
+
+// BroadcastBookUpdated broadcasts a BOOK_UPDATED message to all clients.
+func (h *Hub) BroadcastBookUpdated(bookID int64) {
+	h.BroadcastToAll(Message{Type: "BOOK_UPDATED", Payload: fmt.Sprintf("%d", bookID)})
 }
