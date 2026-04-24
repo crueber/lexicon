@@ -141,6 +141,11 @@ export function createWebSocketClient(getToken: () => string | null): WSClient {
         window.dispatchEvent(new CustomEvent("book-deleted", { detail: msg.payload }));
       }
 
+      // Handle METADATA_PROPOSAL_READY by dispatching a custom event for admin UIs.
+      if (msg.type === "METADATA_PROPOSAL_READY") {
+        window.dispatchEvent(new CustomEvent("metadata-proposal-ready", { detail: msg.payload }));
+      }
+
       dispatch(msg);
     };
 

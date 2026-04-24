@@ -17,12 +17,16 @@ var ErrProposalNotFound = errors.New("proposal not found")
 // BroadcastBookUpdatedFunc broadcasts a BOOK_UPDATED WebSocket event.
 type BroadcastBookUpdatedFunc func(bookID int64)
 
+// BroadcastProposalReadyFunc broadcasts a METADATA_PROPOSAL_READY WebSocket event.
+type BroadcastProposalReadyFunc func(proposalID int64)
+
 // Service orchestrates metadata providers and manages proposals.
 type Service struct {
 	db                     *sql.DB
 	providers              map[string]Provider
 	logger                 *slog.Logger
 	broadcastBookUpdated   BroadcastBookUpdatedFunc
+	broadcastProposalReady BroadcastProposalReadyFunc
 }
 
 // NewService creates a new metadata Service.
@@ -37,6 +41,11 @@ func NewService(db *sql.DB, logger *slog.Logger) *Service {
 // WithBroadcastBookUpdatedFunc sets the broadcast function for book updates.
 func (s *Service) WithBroadcastBookUpdatedFunc(fn BroadcastBookUpdatedFunc) {
 	s.broadcastBookUpdated = fn
+}
+
+// WithBroadcastProposalReadyFunc sets the broadcast function for metadata proposal readiness.
+func (s *Service) WithBroadcastProposalReadyFunc(fn BroadcastProposalReadyFunc) {
+	s.broadcastProposalReady = fn
 }
 
 // RegisterProvider adds a provider to the registry.
@@ -82,6 +91,10 @@ func (s *Service) CreateProposal(ctx context.Context, bookID int64, result Resul
 	proposal, err := q.CreateMetadataProposal(ctx, params)
 	if err != nil {
 		return 0, fmt.Errorf("create metadata proposal: %w", err)
+	}
+
+	if s.broadcastProposalReady != nil {
+		s.broadcastProposalReady(proposal.ID)
 	}
 
 	return proposal.ID, nil

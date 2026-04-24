@@ -125,3 +125,8 @@ func (h *Hub) BroadcastBookUpdated(bookID int64) {
 func (h *Hub) BroadcastBookDeleted(bookID int64) {
 	h.BroadcastToAll(Message{Type: "BOOK_DELETED", Payload: fmt.Sprintf("%d", bookID)})
 }
+
+// BroadcastMetadataProposalReady broadcasts a METADATA_PROPOSAL_READY message to all clients.
+func (h *Hub) BroadcastMetadataProposalReady(proposalID int64) {
+	h.BroadcastToAll(Message{Type: "METADATA_PROPOSAL_READY", Payload: fmt.Sprintf("%d", proposalID)})
+}

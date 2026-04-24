@@ -204,6 +204,9 @@ func New(cfg Config) (*Server, error) {
 	metadataSvc.WithBroadcastBookUpdatedFunc(func(bookID int64) {
 		hub.BroadcastBookUpdated(bookID)
 	})
+	metadataSvc.WithBroadcastProposalReadyFunc(func(proposalID int64) {
+		hub.BroadcastMetadataProposalReady(proposalID)
+	})
 	metadataSvc.RegisterProvider(metadata.NewGoogleBooksProvider(cfg.GoogleBooksAPIKey, logger))
 	metadataSvc.RegisterProvider(metadata.NewOpenLibraryProvider(logger))
 	metadataSvc.RegisterProvider(metadata.NewHardcoverProvider(cfg.HardcoverAPIKey, logger))
