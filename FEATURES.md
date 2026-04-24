@@ -286,6 +286,4 @@ A comprehensive feature list for Lexicon, a self-hosted digital library manager.
 
 ---
 
-## Not Yet Implemented
 
-All planned features have been implemented.
