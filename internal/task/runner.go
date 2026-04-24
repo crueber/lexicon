@@ -111,6 +111,9 @@ func (r *Runner) execute(ctx context.Context, cancel context.CancelFunc, taskID 
 			r.logger.Error("fail task record", "task_id", taskID, "error", dbErr)
 		}
 		r.broadcastFailed(taskID, taskType, errMsg)
+		if r.hub != nil {
+			r.hub.BroadcastNotification([]int64{}, "Task Failed", fmt.Sprintf("%s failed: %s", taskType, errMsg))
+		}
 		r.logger.Error("task failed", "task_id", taskID, "task_type", taskType, "error", taskErr)
 		return
 	}
@@ -119,6 +122,9 @@ func (r *Runner) execute(ctx context.Context, cancel context.CancelFunc, taskID 
 		r.logger.Error("complete task record", "task_id", taskID, "error", err)
 	}
 	r.broadcastComplete(taskID, taskType)
+	if r.hub != nil {
+		r.hub.BroadcastNotification([]int64{}, "Task Complete", fmt.Sprintf("%s completed", taskType))
+	}
 	r.logger.Info("task completed", "task_id", taskID, "task_type", taskType)
 }
 

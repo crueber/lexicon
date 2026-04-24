@@ -146,6 +146,11 @@ export function createWebSocketClient(getToken: () => string | null): WSClient {
         window.dispatchEvent(new CustomEvent("metadata-proposal-ready", { detail: msg.payload }));
       }
 
+      // Handle NOTIFICATION by dispatching a custom event for toast displays.
+      if (msg.type === "NOTIFICATION") {
+        window.dispatchEvent(new CustomEvent("ws-notification", { detail: msg.payload }));
+      }
+
       dispatch(msg);
     };
 

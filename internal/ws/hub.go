@@ -130,3 +130,36 @@ func (h *Hub) BroadcastBookDeleted(bookID int64) {
 func (h *Hub) BroadcastMetadataProposalReady(proposalID int64) {
 	h.BroadcastToAll(Message{Type: "METADATA_PROPOSAL_READY", Payload: fmt.Sprintf("%d", proposalID)})
 }
+
+// BroadcastNotification broadcasts a NOTIFICATION message to specific users, or all users if userIDs is empty.
+func (h *Hub) BroadcastNotification(userIDs []int64, title, message string) {
+	payload := fmt.Sprintf(`{"title":"%s","message":"%s"}`, title, message)
+	msg := Message{Type: "NOTIFICATION", Payload: payload}
+
+	if len(userIDs) == 0 {
+		h.BroadcastToAll(msg)
+		return
+	}
+
+	h.mu.RLock()
+	// Collect targets while holding the read lock.
+	var targets []*Client
+	for _, uid := range userIDs {
+		for c := range h.clients[uid] {
+			targets = append(targets, c)
+		}
+	}
+	h.mu.RUnlock()
+
+	for _, c := range targets {
+		select {
+		case c.send <- msg:
+		default:
+			// Channel full — drop the message rather than blocking.
+			h.logger.Warn("websocket send channel full, dropping message",
+				"user_id", c.userID,
+				"type", msg.Type,
+			)
+		}
+	}
+}

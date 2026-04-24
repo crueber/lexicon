@@ -3,6 +3,7 @@ package library
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"path/filepath"
 	"sync"
@@ -250,6 +251,11 @@ func (w *Watcher) handleDirChange(ctx context.Context, dir string) {
 							"booksAdded": result.BooksAdded,
 						},
 					})
+				}
+
+				// Broadcast a generic notification after scan completes.
+				if w.hub != nil {
+					w.hub.BroadcastNotification([]int64{}, "Scan Complete", fmt.Sprintf("Library scan added %d books", result.BooksAdded))
 				}
 
 				// Only scan once per library even if multiple paths match.
