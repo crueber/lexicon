@@ -55,3 +55,5 @@ type Proposal struct {
 	Data       Result
 	CreatedAt  string
 }
+
+

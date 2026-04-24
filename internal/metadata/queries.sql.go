@@ -62,6 +62,17 @@ func (q *Queries) GetMetadataProposal(ctx context.Context, id int64) (MetadataPr
 	return i, err
 }
 
+const getProviderPriority = `-- name: GetProviderPriority :one
+SELECT priority FROM provider_priority WHERE provider_name = ?
+`
+
+func (q *Queries) GetProviderPriority(ctx context.Context, providerName string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getProviderPriority, providerName)
+	var priority int64
+	err := row.Scan(&priority)
+	return priority, err
+}
+
 const listMetadataProposals = `-- name: ListMetadataProposals :many
 SELECT id, book_id, provider, provider_id, status, data, created_at FROM metadata_proposal WHERE book_id = ? ORDER BY created_at DESC
 `
@@ -148,6 +159,38 @@ func (q *Queries) ListPendingProposals(ctx context.Context) ([]ListPendingPropos
 	return items, nil
 }
 
+const listProviderPriorities = `-- name: ListProviderPriorities :many
+SELECT provider_name, priority FROM provider_priority ORDER BY provider_name
+`
+
+type ListProviderPrioritiesRow struct {
+	ProviderName string `json:"provider_name"`
+	Priority     int64  `json:"priority"`
+}
+
+func (q *Queries) ListProviderPriorities(ctx context.Context) ([]ListProviderPrioritiesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listProviderPriorities)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListProviderPrioritiesRow{}
+	for rows.Next() {
+		var i ListProviderPrioritiesRow
+		if err := rows.Scan(&i.ProviderName, &i.Priority); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateProposalStatus = `-- name: UpdateProposalStatus :exec
 UPDATE metadata_proposal SET status = ? WHERE id = ?
 `
@@ -159,5 +202,20 @@ type UpdateProposalStatusParams struct {
 
 func (q *Queries) UpdateProposalStatus(ctx context.Context, arg UpdateProposalStatusParams) error {
 	_, err := q.db.ExecContext(ctx, updateProposalStatus, arg.Status, arg.ID)
+	return err
+}
+
+const upsertProviderPriority = `-- name: UpsertProviderPriority :exec
+INSERT INTO provider_priority (provider_name, priority) VALUES (?, ?)
+ON CONFLICT(provider_name) DO UPDATE SET priority = excluded.priority
+`
+
+type UpsertProviderPriorityParams struct {
+	ProviderName string `json:"provider_name"`
+	Priority     int64  `json:"priority"`
+}
+
+func (q *Queries) UpsertProviderPriority(ctx context.Context, arg UpsertProviderPriorityParams) error {
+	_, err := q.db.ExecContext(ctx, upsertProviderPriority, arg.ProviderName, arg.Priority)
 	return err
 }

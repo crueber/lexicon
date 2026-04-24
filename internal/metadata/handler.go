@@ -53,6 +53,120 @@ func (h *Handler) AdminRoutes(r chi.Router) {
 	r.Put("/settings/metadata", h.handleSaveMetadataSettings)
 }
 
+// HandleMergeProposals handles POST /api/metadata/proposals/merge.
+func (h *Handler) HandleMergeProposals(w http.ResponseWriter, r *http.Request) {
+	principal := auth.PrincipalFromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	if !principal.IsAdmin() && !principal.Permissions.CanEditMetadata {
+		writeError(w, http.StatusForbidden, "insufficient permissions")
+		return
+	}
+
+	var req struct {
+		BookID      int64   `json:"bookId"`
+		ProposalIDs []int64 `json:"proposalIds"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.BookID <= 0 || len(req.ProposalIDs) == 0 {
+		writeError(w, http.StatusBadRequest, "bookId and proposalIds are required")
+		return
+	}
+
+	if err := h.svc.MergeProposals(r.Context(), req.BookID, req.ProposalIDs); err != nil {
+		if errors.Is(err, ErrProposalNotFound) {
+			writeError(w, http.StatusNotFound, "proposal not found")
+			return
+		}
+		h.logger.Error("merge proposals", "book_id", req.BookID, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// HandleListProviderPriorities handles GET /api/metadata/provider-priorities.
+func (h *Handler) HandleListProviderPriorities(w http.ResponseWriter, r *http.Request) {
+	principal := auth.PrincipalFromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	if !principal.IsAdmin() {
+		writeError(w, http.StatusForbidden, "insufficient permissions")
+		return
+	}
+
+	priorities, err := h.svc.GetProviderPriorities(r.Context())
+	if err != nil {
+		h.logger.Error("list provider priorities", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	type providerPriorityResponse struct {
+		Provider string `json:"provider"`
+		Priority int64  `json:"priority"`
+	}
+
+	resp := make([]providerPriorityResponse, 0, len(priorities))
+	for _, p := range priorities {
+		resp = append(resp, providerPriorityResponse{
+			Provider: p.ProviderName,
+			Priority: p.Priority,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// HandleSetProviderPriority handles PUT /api/metadata/provider-priorities/{provider}.
+func (h *Handler) HandleSetProviderPriority(w http.ResponseWriter, r *http.Request) {
+	principal := auth.PrincipalFromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	if !principal.IsAdmin() {
+		writeError(w, http.StatusForbidden, "insufficient permissions")
+		return
+	}
+
+	provider := chi.URLParam(r, "provider")
+	if provider == "" {
+		writeError(w, http.StatusBadRequest, "provider is required")
+		return
+	}
+
+	var req struct {
+		Priority int `json:"priority"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Priority < 1 || req.Priority > 10 {
+		writeError(w, http.StatusBadRequest, "priority must be between 1 and 10")
+		return
+	}
+
+	if err := h.svc.SetProviderPriority(r.Context(), provider, req.Priority); err != nil {
+		h.logger.Error("set provider priority", "provider", provider, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // handleSearch handles GET /api/metadata/search?title={}&author={}&isbn={}&bookType={}.
 func (h *Handler) handleSearch(w http.ResponseWriter, r *http.Request) {
 	query := Query{

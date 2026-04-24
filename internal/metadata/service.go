@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 
 	"github.com/crueber/lexicon/internal/book"
 )
@@ -308,6 +309,197 @@ func (s *Service) ListProposals(ctx context.Context, bookID int64) ([]Proposal, 
 	}
 
 	return proposals, nil
+}
+
+// MergeProposals merges multiple proposals for the same book using provider priorities.
+func (s *Service) MergeProposals(ctx context.Context, bookID int64, proposalIDs []int64) error {
+	q := New(s.db)
+
+	// Fetch all proposals.
+	type proposalWithResult struct {
+		proposal MetadataProposal
+		result   Result
+	}
+
+	proposals := make([]proposalWithResult, 0, len(proposalIDs))
+	for _, id := range proposalIDs {
+		proposal, err := q.GetMetadataProposal(ctx, id)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrProposalNotFound
+			}
+			return fmt.Errorf("get proposal %d: %w", id, err)
+		}
+
+		if proposal.Status != "PENDING" {
+			return fmt.Errorf("proposal %d is not pending (status: %s)", id, proposal.Status)
+		}
+
+		if proposal.BookID != bookID {
+			return fmt.Errorf("proposal %d belongs to book %d, expected %d", id, proposal.BookID, bookID)
+		}
+
+		var result Result
+		if err := json.Unmarshal([]byte(proposal.Data), &result); err != nil {
+			return fmt.Errorf("parse proposal %d data: %w", id, err)
+		}
+
+		proposals = append(proposals, proposalWithResult{proposal: proposal, result: result})
+	}
+
+	// Build ranked proposals with provider priorities (default 5).
+	type rankedProposal struct {
+		proposalWithResult
+		priority int
+	}
+
+	ranked := make([]rankedProposal, 0, len(proposals))
+	for _, p := range proposals {
+		priority, err := q.GetProviderPriority(ctx, p.proposal.Provider)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				priority = 5
+			} else {
+				return fmt.Errorf("get provider priority for %q: %w", p.proposal.Provider, err)
+			}
+		}
+		ranked = append(ranked, rankedProposal{proposalWithResult: p, priority: int(priority)})
+	}
+
+	// Sort by priority descending (highest first).
+	sort.Slice(ranked, func(i, j int) bool {
+		return ranked[i].priority > ranked[j].priority
+	})
+
+	// Load current book metadata to check lock flags.
+	bq := book.New(s.db)
+	meta, err := bq.GetBookMetadata(ctx, bookID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("get book metadata: %w", err)
+	}
+
+	// Build upsert params, respecting lock flags and picking highest-priority value.
+	upsertParams := book.UpsertBookMetadataParams{
+		BookID: bookID,
+	}
+
+	pickString := func(locked int64, current sql.NullString, getter func(r Result) string) sql.NullString {
+		if locked != 0 {
+			return current
+		}
+		for _, rp := range ranked {
+			if v := getter(rp.result); v != "" {
+				return sql.NullString{String: v, Valid: true}
+			}
+		}
+		return current
+	}
+
+	pickInt64 := func(locked int64, current sql.NullInt64, getter func(r Result) int64) sql.NullInt64 {
+		if locked != 0 {
+			return current
+		}
+		for _, rp := range ranked {
+			if v := getter(rp.result); v > 0 {
+				return sql.NullInt64{Int64: v, Valid: true}
+			}
+		}
+		return current
+	}
+
+	upsertParams.Title = pickString(meta.TitleLocked, meta.Title, func(r Result) string { return r.Title })
+	upsertParams.Subtitle = pickString(meta.SubtitleLocked, meta.Subtitle, func(r Result) string { return r.Subtitle })
+	upsertParams.Description = pickString(meta.DescriptionLocked, meta.Description, func(r Result) string { return r.Description })
+	upsertParams.Publisher = pickString(meta.PublisherLocked, meta.Publisher, func(r Result) string { return r.Publisher })
+	upsertParams.PublishDate = pickString(meta.PublishDateLocked, meta.PublishDate, func(r Result) string { return r.PublishDate })
+	upsertParams.Language = pickString(meta.LanguageLocked, meta.Language, func(r Result) string { return r.Language })
+	upsertParams.Isbn10 = pickString(meta.Isbn10Locked, meta.Isbn10, func(r Result) string { return r.ISBN10 })
+	upsertParams.Isbn13 = pickString(meta.Isbn13Locked, meta.Isbn13, func(r Result) string { return r.ISBN13 })
+	upsertParams.PageCount = pickInt64(meta.PageCountLocked, meta.PageCount, func(r Result) int64 { return int64(r.PageCount) })
+
+	if err := bq.UpsertBookMetadata(ctx, upsertParams); err != nil {
+		return fmt.Errorf("upsert book metadata: %w", err)
+	}
+
+	// Update authors if not locked (no per-field lock for authors; use title lock as proxy).
+	var mergedAuthors []string
+	if meta.TitleLocked == 0 {
+		for _, rp := range ranked {
+			if len(rp.result.Authors) > 0 {
+				mergedAuthors = rp.result.Authors
+				break
+			}
+		}
+	}
+	if len(mergedAuthors) > 0 {
+		if _, err := s.db.ExecContext(ctx, "DELETE FROM book_author WHERE book_id = ?", bookID); err != nil {
+			return fmt.Errorf("clear book authors: %w", err)
+		}
+		for i, authorName := range mergedAuthors {
+			author, err := bq.GetOrCreateAuthor(ctx, authorName)
+			if err != nil {
+				return fmt.Errorf("get or create author %q: %w", authorName, err)
+			}
+			if err := bq.LinkBookAuthor(ctx, book.LinkBookAuthorParams{
+				BookID:    bookID,
+				AuthorID:  author.ID,
+				SortOrder: int64(i),
+			}); err != nil {
+				return fmt.Errorf("link book author %q: %w", authorName, err)
+			}
+		}
+	}
+
+	// Mark all proposals as ACCEPTED.
+	for _, rp := range ranked {
+		if err := q.UpdateProposalStatus(ctx, UpdateProposalStatusParams{
+			Status: "ACCEPTED",
+			ID:     rp.proposal.ID,
+		}); err != nil {
+			return fmt.Errorf("update proposal %d status: %w", rp.proposal.ID, err)
+		}
+	}
+
+	s.logger.Info("metadata proposals merged",
+		"book_id", bookID,
+		"proposal_count", len(proposalIDs),
+	)
+
+	if s.broadcastBookUpdated != nil {
+		s.broadcastBookUpdated(bookID)
+	}
+
+	return nil
+}
+
+// GetProviderPriorities returns all configured provider priorities.
+func (s *Service) GetProviderPriorities(ctx context.Context) ([]ProviderPriority, error) {
+	q := New(s.db)
+	rows, err := q.ListProviderPriorities(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list provider priorities: %w", err)
+	}
+
+	priorities := make([]ProviderPriority, 0, len(rows))
+	for _, row := range rows {
+		priorities = append(priorities, ProviderPriority{
+			ProviderName: row.ProviderName,
+			Priority:     row.Priority,
+		})
+	}
+	return priorities, nil
+}
+
+// SetProviderPriority sets the priority for a provider.
+func (s *Service) SetProviderPriority(ctx context.Context, provider string, priority int) error {
+	q := New(s.db)
+	if err := q.UpsertProviderPriority(ctx, UpsertProviderPriorityParams{
+		ProviderName: provider,
+		Priority:     int64(priority),
+	}); err != nil {
+		return fmt.Errorf("upsert provider priority: %w", err)
+	}
+	return nil
 }
 
 // GetAppSetting retrieves an app setting value by key.

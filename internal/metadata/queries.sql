@@ -18,3 +18,13 @@ FROM metadata_proposal mp
 LEFT JOIN book_metadata bm ON mp.book_id = bm.book_id
 WHERE mp.status = 'PENDING'
 ORDER BY mp.created_at DESC;
+
+-- name: GetProviderPriority :one
+SELECT priority FROM provider_priority WHERE provider_name = ?;
+
+-- name: UpsertProviderPriority :exec
+INSERT INTO provider_priority (provider_name, priority) VALUES (?, ?)
+ON CONFLICT(provider_name) DO UPDATE SET priority = excluded.priority;
+
+-- name: ListProviderPriorities :many
+SELECT provider_name, priority FROM provider_priority ORDER BY provider_name;

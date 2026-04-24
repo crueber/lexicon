@@ -183,6 +183,11 @@ func (s *Server) setupRoutes() {
 		r.Route("/metadata", func(r chi.Router) {
 			r.Use(auth.RequireAuth(s.cfg.JWTSecret))
 			s.metadataHandler.Routes(r)
+			r.Post("/proposals/merge", s.metadataHandler.HandleMergeProposals)
+			r.With(auth.RequireAdmin()).Group(func(r chi.Router) {
+				r.Get("/provider-priorities", s.metadataHandler.HandleListProviderPriorities)
+				r.Put("/provider-priorities/{provider}", s.metadataHandler.HandleSetProviderPriority)
+			})
 		})
 
 		// BookDrop routes (require auth).

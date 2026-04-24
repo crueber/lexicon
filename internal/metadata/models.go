@@ -342,6 +342,13 @@ type OidcSession struct {
 	CreatedAt   string         `json:"created_at"`
 }
 
+type ProviderPriority struct {
+	ID           int64  `json:"id"`
+	ProviderName string `json:"provider_name"`
+	Priority     int64  `json:"priority"`
+	CreatedAt    string `json:"created_at"`
+}
+
 type ReadingSession struct {
 	ID            int64          `json:"id"`
 	UserID        int64          `json:"user_id"`
